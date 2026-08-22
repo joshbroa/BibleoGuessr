@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-leather-950 text-parchment-100 font-display antialiased;
+    background-image:
+      radial-gradient(ellipse at 50% -10%, rgba(217, 180, 91, 0.16), transparent 60%),
+      radial-gradient(ellipse at 50% 120%, rgba(74, 44, 26, 0.5), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  /* Keyboard users must always be able to see where they are; the game binds
+     Space to submit, so focus visibility is not cosmetic here. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-gilt-400 ring-offset-2 ring-offset-leather-950;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5
+           text-sm font-semibold tracking-wide transition
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-gilt-500 text-leather-950 hover:bg-gilt-400
+           active:translate-y-px shadow-lg shadow-gilt-600/20;
+  }
+
+  .btn-secondary {
+    @apply btn border border-gilt-600/50 bg-leather-800/60 text-parchment-100
+           hover:border-gilt-500 hover:bg-leather-700/70 active:translate-y-px;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-800 text-red-50 hover:bg-red-700 active:translate-y-px;
+  }
+
+  .panel {
+    @apply rounded-xl border border-gilt-600/25 bg-leather-900/70 p-6
+           shadow-xl shadow-black/40 backdrop-blur-sm;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-widest text-parchment-400;
+  }
+
+  .field-input {
+    @apply w-full rounded-md border border-gilt-600/30 bg-leather-950/70 px-3 py-2
+           text-parchment-50 placeholder:text-parchment-400/50
+           focus:border-gilt-500 focus:outline-none focus:ring-1 focus:ring-gilt-500;
+  }
+
+  .form-error {
+    @apply rounded-md border border-red-500/40 bg-red-950/50 px-3 py-2 text-sm text-red-200;
+  }
+
+  .form-note {
+    @apply rounded-md border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scripture typography
+   ---------------------------------------------------------------------------
+   Every metric below must match scripts/generate_bible_pages.py. Line breaks
+   and inter-word spacing are decided by that script, never by the browser, so
+   the page a player sees is byte-for-byte the page the server scored against.
+   -------------------------------------------------------------------------- */
+.scripture {
+  font-family: 'Times New Roman', Times, Georgia, serif;
+  color: theme('colors.ink.900');
+  text-rendering: geometricPrecision;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  /* Pages are dragged to turn them, and a drag over text otherwise paints a
+     blue selection across the page, which is both ugly and distracting. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scripture-line {
+  white-space: nowrap;
+  display: block;
+}
+
+.scripture-word {
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* Hover paints the whole verse, not the single word under the cursor, so what
+   you are about to pick is what you see. Driven by JS rather than :hover
+   because the words of a verse are siblings CSS cannot reach from one another. */
+.scripture .is-hovered {
+  --hl: rgba(199, 154, 60, 0.32);
+  background-color: var(--hl);
+}
+
+/* `--hl` is read by the inline box-shadow that bridges the gaps between the
+   words of a highlighted verse; it must match the background colour. */
+.scripture .is-selected {
+  --hl: theme('colors.gilt.500');
+  background-color: var(--hl);
+  color: theme('colors.leather.950');
+}
+
+.scripture-verse-num {
+  /* Offset with position rather than vertical-align: super, which would grow
+     the line box and break the fixed line grid the page data assumes. */
+  display: inline-block;
+  position: relative;
+  top: -0.32em;
+  vertical-align: baseline;
+  font-weight: 700;
+  user-select: none;
+}
+
+.scripture .is-answer {
+  --hl: #15803d;
+  background-color: var(--hl);
+  color: #f0fdf4;
+}
+
+.page-paper {
+  background-color: #fbf6e9;
+  background-image:
+    linear-gradient(105deg, rgba(0, 0, 0, 0.035) 0%, transparent 22%),
+    radial-gradient(circle at 78% 12%, rgba(160, 130, 80, 0.09), transparent 45%);
+}

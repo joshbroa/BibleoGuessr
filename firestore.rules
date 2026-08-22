@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// BibleoGuessr Firestore security model
+// -------------------------------------
+// The single most important rule here: an in-progress game holds the SECRET
+// answer for every round. If a client could read /games/{gameId}, the whole game
+// would be trivially cheatable with the network tab. So /games is server-only —
+// every read and write goes through Cloud Functions running with admin
+// privileges, which strip the answers before returning anything to the client.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- User profiles -----------------------------------------------------
+    // Readable by their owner only. Writes are funnelled through Cloud
+    // Functions so username uniqueness, the profanity filter and the two-week
+    // rename cooldown cannot be bypassed by writing straight from the client.
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false;
+    }
+
+    // --- Username reservations --------------------------------------------
+    // Existence of a doc here is what makes a username unique. Client reads are
+    // allowed so the signup form can show "taken" instantly; only functions
+    // may claim or release one.
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // --- Active games ------------------------------------------------------
+    // Contains unresolved answers. No client access at all, ever.
+    match /games/{gameId} {
+      allow read, write: if false;
+    }
+
+    // --- Completed game history -------------------------------------------
+    // Answers are public knowledge once a game is finished, so owners may read
+    // their own archive. Writes stay server-side so scores cannot be forged.
+    match /games_history/{historyId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

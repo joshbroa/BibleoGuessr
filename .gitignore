@@ -1,1 +1,24 @@
+# Secrets
 .env.local
+.env*.local
+
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Generated Bible page data (~40MB, rebuild with `npm run pages`)
+public/bible_pages/
+functions/src/bible_pages/
+functions/src/verse_pool.json
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+*.log
