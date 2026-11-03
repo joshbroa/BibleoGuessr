@@ -86,6 +86,9 @@ export function friendlyError(error) {
     'auth/unauthorized-continue-uri':
       'This site is not authorised for email links yet. Add its domain to Firebase Authentication → Settings → Authorized domains.',
     'auth/requires-recent-login': 'Please re-enter your password to confirm this change.',
+    'auth/expired-action-code': 'That link has expired. Please request a new one.',
+    'auth/invalid-action-code':
+      'That link is no longer valid. It may have been used already, or a newer one may have replaced it.',
     'auth/network-request-failed': 'Network error. Check your connection and try again.',
     'auth/credential-already-in-use':
       'That email is already registered. Log in to that account instead.',

@@ -6,6 +6,7 @@ import { GameProvider } from '@/context/GameContext';
 
 import Landing from '@/pages/Landing';
 import ForgotPassword from '@/pages/ForgotPassword';
+import AuthAction from '@/pages/AuthAction';
 import NotFound from '@/pages/NotFound';
 import Login from '@/pages/Login';
 import SignUp from '@/pages/SignUp';
@@ -37,6 +38,13 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* Where Firebase's email links land. Set as the action URL on every
+            template, so the links stay on this domain instead of needing a page
+            served by Firebase Hosting — which nothing here is. Must be
+            reachable signed out: a reset link is opened by someone locked out,
+            often on another device. */}
+        <Route path="/auth/action" element={<AuthAction />} />
 
         {/* Reachable signed out: a visitor must be able to read these before
             deciding whether to hand over an email address. */}

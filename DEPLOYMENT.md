@@ -94,7 +94,36 @@ which is still your domain and still the win that matters. Either way set
 **Reply to** to `support@bibleoguessr.com`, which forwards to Gmail — the sending
 address itself needs no inbox.
 
-### 1.2 Custom SMTP through a provider — the fallback
+### 1.2 Point the action URL at this app (!)
+
+Applying the custom domain changes the From address **and the action links** —
+the button in the email becomes `https://bibleoguessr.com/__/auth/action?…`.
+Vercel serves that domain, not Firebase Hosting, so that path meets the SPA
+rewrite in `vercel.json` and renders the 404 page. Verification and password
+reset would break at the moment you apply the domain, having worked until then.
+
+So the app ships its own handler and the templates point at it, which removes
+the question of who serves `/__/auth/action` entirely. Console, then
+Authentication, then Templates, then the pencil icon, then **customize action
+URL**:
+
+    https://bibleoguessr.com/auth/action
+
+One action URL covers every template. `src/pages/AuthAction.jsx` handles
+`verifyEmail`, `resetPassword`, `recoverEmail` and `verifyAndChangeEmail` in the
+site's own styling, and returns people to the game through the `continueUrl`
+the app attaches when it sends the mail.
+
+**Order matters.** The handler has to be live before the templates point at it,
+or any link sent in between lands on a page that does not exist yet:
+
+1. Deploy to Vercel with `/auth/action` present.
+2. Set the custom action URL.
+3. Apply the custom domain.
+4. Set From and Reply to, and rewrite the bodies.
+5. Send yourself one of each and follow both links.
+
+### 1.3 Custom SMTP through a provider — the fallback
 
 Only worth it if you need a From address Firebase will not give you, or you want
 one provider for auth mail and everything else later. Firebase then hands every
@@ -119,7 +148,37 @@ Going this way, verify the domain in the provider first, and keep its return-pat
 `MX` on a subdomain (`send.bibleoguessr.com` is Resend's default) so it cannot
 collide with the root `MX` records that deliver your forwarded mail.
 
-### 1.3 Check it end to end
+### 1.4 DMARC — the record Firebase does not ask for
+
+Firebase's four records give you SPF and DKIM. They do not give you DMARC, and
+its absence is now a deliverability problem in its own right: Gmail and Yahoo
+both treat an unauthenticated-looking sender more harshly when the domain
+publishes no policy at all.
+
+Add one `TXT` record at Spaceship:
+
+| Name | Value |
+| --- | --- |
+| `_dmarc` | `v=DMARC1; p=none; rua=mailto:support@bibleoguessr.com` |
+
+`p=none` means "monitor, do not reject". That is the right starting point — a
+strict policy on a domain you have not yet watched can silently destroy mail you
+did want delivered. The `rua` address collects the weekly aggregate reports.
+
+**Before ever tightening to `p=quarantine` or `p=reject`**, make sure the SPF
+record covers *everything* that sends as this domain — Firebase, and whatever
+path you use to reply as `support@` or `privacy@` from Gmail. Tightening the
+policy while a sender is missing from SPF is how people take down their own
+email.
+
+Sanity-check the whole set in one go:
+
+    Resolve-DnsName bibleoguessr.com -Type TXT
+
+Exactly one `v=spf1` record, plus the `firebase=` token. Two SPF records is the
+failure mode to look for.
+
+### 1.5 Check it end to end
 
 Sign up with a real address on the deployed site. The mail should arrive from
 `@bibleoguessr.com`, the link inside should point at your domain, and following
@@ -166,6 +225,15 @@ lives in the Google Cloud console, on the same database:
 
 - Collection group: `games`
 - Timestamp field: `expiresAt`
+
+Leave **expiration offset** at `0`. It is not the retention period — it delays
+deletion by that much *past* the timestamp in the field, and the retention is
+already baked into the document by `GAME_RETENTION_DAYS` in
+`functions/index.js`. An offset of 7 days there means 37 days in total, with the
+number living in two places. Note that the offset cannot be edited in place: it
+needs the policy deleted and recreated, and the backend rejects the new one with
+`Cannot modify TTL offset` until the delete has finished propagating, which
+takes ten minutes or more.
 
 Both are free-text fields, so the policy can be created before a single game
 exists. Do not go looking for `games` in the Firebase console's **Data** tab — a collection
@@ -295,15 +363,15 @@ unsure about your obligations have someone qualified read it.
 
 Check each of these on the live site:
 
-- [ ] Landing page loads, and Continue as Guest starts a session.
-- [ ] A full game plays: 3D Bible opens, pages turn, a guess scores.
+- [X] Landing page loads, and Continue as Guest starts a session.
+- [X] A full game plays: 3D Bible opens, pages turn, a guess scores.
 - [ ] Sign up works, and the verification email arrives from
       `@bibleoguessr.com`. Check spam. The link inside should also be on
       `bibleoguessr.com`, not `firebaseapp.com`.
 - [ ] Forgot password sends a reset link, and the link sets a new password.
-- [ ] Game history saves for a signed-in player.
+- [X] Game history saves for a signed-in player.
 - [ ] Account deletion works from Settings.
-- [ ] `/legal/privacy` and `/legal/terms` show no placeholder banner.
+- [X] `/legal/privacy` and `/legal/terms` show no placeholder banner.
 - [ ] A nonsense URL shows the 404 page rather than a blank screen.
 - [ ] Functions log no `[cors]` warning: `firebase functions:log`.
 
