@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function Landing() {
   const { continueAsGuest } = useAuth();
@@ -22,7 +23,7 @@ export default function Landing() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+    <main className="flex min-h-screen flex-col items-center justify-center px-4 pt-12">
       <div className="w-full max-w-lg text-center animate-fade-up">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.35em] text-gilt-500">
           King James Version
@@ -64,6 +65,8 @@ export default function Landing() {
           Guests can play right away. Sign up whenever you like — your games so far come with you.
         </p>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

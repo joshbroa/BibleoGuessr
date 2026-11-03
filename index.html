@@ -3,14 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a0e07" />
+
+    <title>BibleoGuessr — guess where a verse lives in the Bible</title>
     <meta
       name="description"
-      content="BibleoGuessr — read a verse, then find where it lives in the physical Bible."
+      content="GeoGuessr for the King James Bible. Read a verse with no reference attached, then open a 3D Bible at the page you think it came from."
     />
-    <title>BibleoGuessr</title>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="canonical" href="https://bibleoguessr.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BibleoGuessr" />
+    <meta property="og:title" content="BibleoGuessr" />
+    <meta
+      property="og:description"
+      content="You get a verse. No book, no chapter, no number — just the words. Open the Bible where you think it came from."
+    />
+    <meta property="og:url" content="https://bibleoguessr.com/" />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      BibleoGuessr needs JavaScript to render the Bible and run a game. Please enable it and
+      reload.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

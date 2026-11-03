@@ -1,0 +1,15 @@
+# BibleoGuessr
+User-agent: *
+Allow: /$
+Allow: /legal/
+
+# Nothing below is useful to a crawler: game and account routes need a session,
+# and the page data is ~3,200 JSON fragments of scripture layout.
+Disallow: /game/
+Disallow: /play/
+Disallow: /settings
+Disallow: /history
+Disallow: /home
+Disallow: /bible_pages/
+
+Sitemap: https://bibleoguessr.com/sitemap.xml

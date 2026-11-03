@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BibleoGuessr">
+  <rect width="64" height="64" rx="10" fill="#2a170d"/>
+  <!-- Closed book seen fore-edge on, the way a round begins. -->
+  <rect x="17" y="10" width="30" height="44" rx="2" fill="#4a2c1a"/>
+  <rect x="22" y="12" width="22" height="40" rx="1" fill="#f3ead6"/>
+  <g stroke="#c9b894" stroke-width="1" opacity="0.65">
+    <line x1="26" y1="13" x2="26" y2="51"/>
+    <line x1="30" y1="13" x2="30" y2="51"/>
+    <line x1="34" y1="13" x2="34" y2="51"/>
+    <line x1="38" y1="13" x2="38" y2="51"/>
+    <line x1="42" y1="13" x2="42" y2="51"/>
+  </g>
+  <rect x="17" y="10" width="6" height="44" rx="2" fill="#3a2113"/>
+  <rect x="19" y="27" width="2" height="10" rx="1" fill="#d9b45b"/>
+</svg>

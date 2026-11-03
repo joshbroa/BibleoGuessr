@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import VerifyEmailBanner from '@/components/VerifyEmailBanner';
 
 /**
  * The navbar is state-dependent by design: a registered player gets their
@@ -15,11 +16,13 @@ export default function Navbar() {
   }
 
   return (
-    <header className="border-b border-gilt-600/20 bg-leather-950/70 backdrop-blur">
-      <nav
-        className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3"
-        aria-label="Main"
-      >
+    <header className="bg-leather-950/70 backdrop-blur">
+      <VerifyEmailBanner />
+      <div className="border-b border-gilt-600/20">
+        <nav
+          className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3"
+          aria-label="Main"
+        >
         <Link
           to="/home"
           className="font-display text-lg font-bold tracking-tight text-gilt-400 hover:text-gilt-300"
@@ -53,7 +56,8 @@ export default function Navbar() {
             </Link>
           </div>
         )}
-      </nav>
+        </nav>
+      </div>
     </header>
   );
 }

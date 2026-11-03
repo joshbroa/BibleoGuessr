@@ -8,6 +8,8 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -19,6 +21,30 @@ import {
   claimGuestHistory,
 } from '@/lib/api';
 
+/**
+ * Where Firebase should send someone once it has finished with a verification
+ * or password-reset link.
+ *
+ * Without this the link lands on Firebase's own "your email is verified" page
+ * and dead-ends there — no way back to the game. With it, that page gets a
+ * Continue button pointing here.
+ *
+ * Read from the live origin rather than from SITE_URL so a link generated
+ * against the emulator comes back to localhost instead of to production.
+ * Firebase rejects a continue URL whose host is not listed under
+ * Authentication → Settings → Authorized domains, which is why the real domain
+ * has to be added there before launch.
+ */
+function continueTo(path) {
+  if (typeof window === 'undefined') return undefined;
+  return {
+    url: new URL(path, window.location.origin).toString(),
+    // false = Firebase hosts the page that consumes the code. Flipping this to
+    // true means handling oobCode ourselves, which we deliberately do not.
+    handleCodeInApp: false,
+  };
+}
+
 const AuthContext = createContext(null);
 
 export function useAuth() {
@@ -29,6 +55,10 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  // Tracked separately from `user`: Firebase mutates the user object in place
+  // when it reloads, so a React state holding that same object never changes
+  // identity and never triggers a re-render.
+  const [emailVerified, setEmailVerified] = useState(false);
   const [profile, setProfile] = useState(null);
   const [initialising, setInitialising] = useState(true);
 
@@ -42,6 +72,7 @@ export function AuthProvider({ children }) {
       profileUnsubscribe.current = null;
 
       setUser(nextUser);
+      setEmailVerified(Boolean(nextUser?.emailVerified));
 
       if (!nextUser) {
         setProfile(null);
@@ -115,6 +146,15 @@ export function AuthProvider({ children }) {
       await setUsernameFn({ username });
     }
 
+    // Prove the address is real. Deliberately not fatal: an unverified account
+    // can be recovered from the banner on the home page, whereas a signup that
+    // throws at the last step leaves the player with no obvious way forward.
+    try {
+      await sendEmailVerification(account, continueTo('/home'));
+    } catch (error) {
+      console.error('[auth] could not send the verification email', error);
+    }
+
     // Anything they finished as a guest is already filed under this uid; now
     // that there is an account to attach it to, promote it into their history.
     // A failure here must not fail the signup — the games stay claimable.
@@ -134,6 +174,41 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     await signOut(auth);
+  }, []);
+
+  /**
+   * Email a password-reset link.
+   *
+   * Firebase both sends the mail and hosts the page the link lands on, so this
+   * needs no reset screen of our own. It also resolves successfully for
+   * addresses that have no account, which is deliberate on Firebase's part and
+   * which we preserve: telling a stranger whether an address is registered
+   * here is an account-enumeration leak.
+   */
+  const requestPasswordReset = useCallback(async (email) => {
+    await sendPasswordResetEmail(auth, email, continueTo('/login'));
+  }, []);
+
+  /** Re-send the verification email for the signed-in account. */
+  const resendVerification = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) throw new Error('You must be signed in.');
+    if (current.emailVerified) return;
+    await sendEmailVerification(current, continueTo('/home'));
+  }, []);
+
+  /**
+   * Pull the account's latest state from Firebase.
+   *
+   * `emailVerified` is baked into the local user object and does not change on
+   * its own, so a player who verifies in another tab would otherwise keep
+   * seeing the "please verify" banner until they signed out and back in.
+   */
+  const refreshUser = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) return;
+    await current.reload();
+    setEmailVerified(current.emailVerified);
   }, []);
 
   /**
@@ -175,6 +250,9 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       isGuest: Boolean(user?.isAnonymous),
       isRegistered: Boolean(user) && !user.isAnonymous,
+      // Guests have no address to verify, so they are never "unverified".
+      emailVerified,
+      needsEmailVerification: Boolean(user) && !user.isAnonymous && !emailVerified,
       displayName: profile?.username || (user?.isAnonymous ? 'Guest' : user?.email) || 'Guest',
       continueAsGuest,
       register,
@@ -183,11 +261,15 @@ export function AuthProvider({ children }) {
       changePassword,
       changeUsername,
       deleteAccount,
+      requestPasswordReset,
+      resendVerification,
+      refreshUser,
     }),
     [
       user,
       profile,
       initialising,
+      emailVerified,
       continueAsGuest,
       register,
       login,
@@ -195,6 +277,9 @@ export function AuthProvider({ children }) {
       changePassword,
       changeUsername,
       deleteAccount,
+      requestPasswordReset,
+      resendVerification,
+      refreshUser,
     ]
   );
 

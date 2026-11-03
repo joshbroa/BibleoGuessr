@@ -82,6 +82,9 @@ export function friendlyError(error) {
     'auth/email-already-in-use': 'An account already exists for that email address.',
     'auth/weak-password': 'Password must be at least 8 characters with letters and numbers.',
     'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+    'auth/missing-email': 'Enter your email address.',
+    'auth/unauthorized-continue-uri':
+      'This site is not authorised for email links yet. Add its domain to Firebase Authentication → Settings → Authorized domains.',
     'auth/requires-recent-login': 'Please re-enter your password to confirm this change.',
     'auth/network-request-failed': 'Network error. Check your connection and try again.',
     'auth/credential-already-in-use':

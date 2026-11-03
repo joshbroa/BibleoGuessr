@@ -94,6 +94,10 @@ Generate the page data (~40MB, gitignored, takes about a minute):
 npm run pages
 ```
 
+The command uses whichever Python 3 the machine actually has — `py` on Windows,
+`python3` on Linux and macOS. Hard-coding either one breaks the other, and
+Windows leaves `python` as a Store stub that only prints an advert.
+
 This writes `public/bible_pages/{1..3198}.json` for the client **and** copies them
 to `functions/src/bible_pages/` so Cloud Functions can score guesses from local
 disk with `fs` — no network hop, and no dependence on anything the client sends.
@@ -143,10 +147,19 @@ nothing else in the codebase would notice, so these tests are the guard.
 
 ## Deploying
 
+**See [DEPLOYMENT.md](DEPLOYMENT.md)** for the first-time walkthrough: Firebase
+setup, Vercel setup, email, the Firestore TTL policy and the launch checklist.
+
+Production is split in two — Vercel serves the static site, while Firebase runs
+Auth, Firestore and the Cloud Functions:
+
 ```bash
-npm run pages          # page data must exist before deploying functions
-npm run deploy         # build + hosting + functions + rules
+npm run deploy:rules       # Firestore rules + indexes
+npm run deploy:functions   # regenerates page data, then deploys the backend
+                           # the frontend redeploys itself from Git via Vercel
 ```
+
+To serve everything from Firebase Hosting instead, `npm run deploy` still works.
 
 Every Cloud Function declares `maxInstances: 10` — set both globally and
 per-function — so a traffic spike or a deliberate flood cannot fan out into a
@@ -186,6 +199,19 @@ email credential onto the existing anonymous user rather than creating a new one
 so the uid is preserved — and because every history document is keyed by uid, the
 guest's games transfer to the new account with no copying and no migration window
 where records could be lost.
+
+### Accounts and email
+
+Firebase Authentication owns passwords, verification mail and password resets —
+there is no mail server here and no password ever reaches our code. Firebase
+relays through Resend over SMTP, so the mail arrives from
+`verify@bibleoguessr.com` rather than from a `firebaseapp.com` address; the
+credential for that lives in the Firebase console, never in this repository.
+
+New accounts are sent a verification link and prompted by a banner until they
+confirm, but nothing in the game is gated on it: an unreachable inbox should not
+cost someone the thing they just signed up for. Both links carry a continue URL
+back to the site, so Firebase's own confirmation page does not dead-end.
 
 ### Translation
 

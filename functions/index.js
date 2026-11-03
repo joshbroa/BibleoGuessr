@@ -47,8 +47,45 @@ const db = getFirestore();
 const MAX_INSTANCES = 10;
 setGlobalOptions({ maxInstances: MAX_INSTANCES });
 
+/**
+ * Browser origins permitted to call these functions.
+ *
+ * Set as a comma-separated list in `functions/.env` (see `.env.example`).
+ * Callables already require a valid Firebase ID token for this project, so this
+ * is defence in depth rather than the primary control — but it costs nothing to
+ * narrow, and the frontend lives on a different origin from the backend once
+ * hosting moves to Vercel, which makes the list worth being explicit about.
+ *
+ * Left unset it accepts any origin, which is firebase-functions' own default.
+ * Breaking every call on a fresh deploy would be a worse failure than a
+ * permissive default, so it warns loudly instead of locking the door.
+ */
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (!ALLOWED_ORIGINS.length) {
+  console.warn(
+    '[cors] ALLOWED_ORIGINS is not set — accepting calls from any origin. ' +
+      'Set it in functions/.env before launch.'
+  );
+}
+
+/**
+ * How long an entry in /games survives.
+ *
+ * These documents are bulky — they hold the full text of every target verse —
+ * and they are working state, not a record: a finished game is copied into
+ * /games_history for anyone signed in. Without expiry the collection grows
+ * without limit and quietly eats the Firestore free tier. Enforced by a TTL
+ * policy on the `expiresAt` field (see DEPLOYMENT.md).
+ */
+const GAME_RETENTION_DAYS = 30;
+
 /** Shared options applied to every callable below. */
 const callableOptions = {
+  cors: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : true,
   maxInstances: MAX_INSTANCES,
   memory: '512MiB',
   timeoutSeconds: 60,
@@ -181,6 +218,8 @@ export const startGame = onCall(callableOptions, async (request) => {
     createdAt: now,
     roundStartedAt: now,
     historySaved: false,
+    // Read by the Firestore TTL policy; see GAME_RETENTION_DAYS.
+    expiresAt: Timestamp.fromMillis(now.toMillis() + GAME_RETENTION_DAYS * 86400000),
   });
 
   return toClientState(ref.id, {

@@ -1,10 +1,12 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { RequireSession, RequireAccount, RedirectIfSignedIn } from '@/components/RouteGuards';
 import { FullPageSpinner } from '@/components/Spinner';
 import { GameProvider } from '@/context/GameContext';
 
 import Landing from '@/pages/Landing';
+import ForgotPassword from '@/pages/ForgotPassword';
+import NotFound from '@/pages/NotFound';
 import Login from '@/pages/Login';
 import SignUp from '@/pages/SignUp';
 import Home from '@/pages/Home';
@@ -16,6 +18,8 @@ const Game = lazy(() => import('@/pages/Game'));
 const RoundResult = lazy(() => import('@/pages/RoundResult'));
 const Summary = lazy(() => import('@/pages/Summary'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const Privacy = lazy(() => import('@/pages/legal/Privacy'));
+const Terms = lazy(() => import('@/pages/legal/Terms'));
 const History = lazy(() => import('@/pages/History'));
 
 export default function App() {
@@ -32,6 +36,12 @@ export default function App() {
         />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* Reachable signed out: a visitor must be able to read these before
+            deciding whether to hand over an email address. */}
+        <Route path="/legal/privacy" element={<Privacy />} />
+        <Route path="/legal/terms" element={<Terms />} />
 
         <Route
           path="/home"
@@ -82,7 +92,9 @@ export default function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* A real 404 rather than a silent redirect, so a mistyped or dead
+            link is visibly wrong instead of looking like a logout. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

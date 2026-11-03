@@ -7,15 +7,16 @@
     "dev": "firebase emulators:exec --ui \"vite --mode emulator\"",
     "dev:live": "vite",
     "build": "vite build",
+    "vercel-build": "node scripts/run-pages.mjs --if-missing && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pages": "python scripts/generate_bible_pages.py",
+    "pages": "node scripts/run-pages.mjs",
     "emulators": "firebase emulators:start",
-    "deploy": "npm run build && firebase deploy",
+    "deploy": "npm run pages && npm run build && firebase deploy",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
-    "deploy:functions": "firebase deploy --only functions",
-    "deploy:rules": "firebase deploy --only firestore:rules"
+    "deploy:functions": "npm run pages && firebase deploy --only functions",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",

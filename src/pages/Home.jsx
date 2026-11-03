@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
+import SiteFooter from '@/components/SiteFooter';
 
 const MODES = [
   {
@@ -34,7 +35,7 @@ export default function Home() {
   const { displayName, isGuest, profile } = useAuth();
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-4 py-10">
@@ -92,6 +93,8 @@ export default function Home() {
           ))}
         </ul>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

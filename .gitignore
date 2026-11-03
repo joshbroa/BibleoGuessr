@@ -1,6 +1,9 @@
-# Secrets
+# Secrets — any .env at any depth, so functions/.env is covered too.
+# The .example templates carry no values and are deliberately tracked.
+.env
 .env.local
 .env*.local
+!.env.example
 
 # Dependencies
 node_modules/
