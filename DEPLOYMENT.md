@@ -85,8 +85,8 @@ Ending in `firebasemail.com` is right. Ending in
 put the trailing dot back.
 
 Verification takes up to 24 hours. When it finishes, click **Apply Custom
-Domain**, then edit both templates so they read like this site rather than a
-Google default.
+Domain**. The message bodies are locked in the console (see 1.2), so this step
+only covers the sender details below.
 
 Then look at the **From** field. If its local part is editable, set
 `verify@bibleoguessr.com`; if it is fixed, you get `noreply@bibleoguessr.com`,
@@ -94,34 +94,36 @@ which is still your domain and still the win that matters. Either way set
 **Reply to** to `support@bibleoguessr.com`, which forwards to Gmail — the sending
 address itself needs no inbox.
 
-### 1.2 Point the action URL at this app (!)
+### 1.2 Point the action URL at this app
 
-Applying the custom domain changes the From address **and the action links** —
-the button in the email becomes `https://bibleoguessr.com/__/auth/action?…`.
-Vercel serves that domain, not Firebase Hosting, so that path meets the SPA
-rewrite in `vercel.json` and renders the 404 page. Verification and password
-reset would break at the moment you apply the domain, having worked until then.
+Out of the box, the button in every email opens Firebase's own handler at
+`https://<project>.firebaseapp.com/__/auth/action`. It works, but the page is
+unstyled and off-domain. Applying the custom domain does **not** change this.
+It moves the From address, not the links.
 
-So the app ships its own handler and the templates point at it, which removes
-the question of who serves `/__/auth/action` entirely. Console, then
-Authentication, then Templates, then the pencil icon, then **customize action
-URL**:
+The app ships its own handler at `/auth/action`. `src/pages/AuthAction.jsx`
+handles `verifyEmail`, `resetPassword`, `recoverEmail` and
+`verifyAndChangeEmail` in the site's own styling, and returns people to the game
+through the `continueUrl` the app attaches when it sends the mail. One action
+URL covers every template:
 
     https://bibleoguessr.com/auth/action
 
-One action URL covers every template. `src/pages/AuthAction.jsx` handles
-`verifyEmail`, `resetPassword`, `recoverEmail` and `verifyAndChangeEmail` in the
-site's own styling, and returns people to the game through the `continueUrl`
-the app attaches when it sends the mail.
+**(!) The action URL and message bodies are locked in the console.** Firebase
+currently refuses console edits to them ("An error occurred updating action
+URL"). Only Sender name, From and Reply to can be saved, and only when nothing
+else in the dialog has changed. To change the action URL, email Firebase
+support with the project ID and the URL above. To change a body, send them the
+template name, subject and full HTML, using `href='%LINK%'` for the button.
 
-**Order matters.** The handler has to be live before the templates point at it,
-or any link sent in between lands on a page that does not exist yet:
+**Order matters.** The handler has to be live before the action URL points at
+it, or any link sent in between lands on the 404 page:
 
 1. Deploy to Vercel with `/auth/action` present.
-2. Set the custom action URL.
-3. Apply the custom domain.
-4. Set From and Reply to, and rewrite the bodies.
-5. Send yourself one of each and follow both links.
+2. Apply the custom domain, then set Sender name, From and Reply to (save
+   those fields on their own).
+3. Ask Firebase support to set the action URL (and any new bodies).
+4. Send yourself one of each and follow both links.
 
 ### 1.3 Custom SMTP through a provider — the fallback
 
