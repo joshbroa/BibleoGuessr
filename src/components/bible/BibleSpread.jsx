@@ -2,6 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import gsap from 'gsap';
 import BiblePage from './BiblePage';
 import { loadPage, windowPages } from '@/lib/pageCache';
+import { play } from '@/lib/sound';
+import { useHoldRepeat } from '@/lib/useHoldRepeat';
+import { ChevronLeft, ChevronRight } from '@/components/wf/Icons';
 
 /**
  * Phase 2: the open Bible, as a real two-page spread.
@@ -142,6 +145,9 @@ export default function BibleSpread({
   interactive = true,
   flipTo = null,
   onFlipDone,
+  // Space to keep clear beneath the spread (the page controls and the game's
+  // action bar), so the whole book stays on screen.
+  reserveBottom = 168,
 }) {
   const totalPages = manifest.totalPages;
 
@@ -152,6 +158,8 @@ export default function BibleSpread({
   const [hovered, setHovered] = useState(null);
   const [scale, setScale] = useState(1);
 
+  const outerRef = useRef(null);
+  const hoveredRef = useRef(null);
   const liveLeafRef = useRef(null);
   const dragRef = useRef(null);
   const draggedRef = useRef(false);
@@ -203,10 +211,14 @@ export default function BibleSpread({
 
   useLayoutEffect(() => {
     function fit() {
-      const availableWidth = window.innerWidth - 48;
-      // Reserves the header, the verse prompt, the page indicator and the
-      // control bar beneath the book, so nothing ever overlaps the spread.
-      const availableHeight = window.innerHeight - 320;
+      // Measured from where the spread actually sits, so a long verse in the
+      // banner above shrinks the book rather than pushing it off screen. The
+      // 24px is the navy board showing round the paper.
+      const node = outerRef.current;
+      const top = node ? node.getBoundingClientRect().top + window.scrollY : 300;
+      const width = node?.parentElement?.clientWidth ?? window.innerWidth;
+      const availableWidth = Math.min(width, window.innerWidth) - 32;
+      const availableHeight = window.innerHeight - top - reserveBottom - 24;
       setScale(
         Math.max(
           0.32,
@@ -217,7 +229,7 @@ export default function BibleSpread({
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, [spreadWidth, manifest.pageHeight]);
+  }, [spreadWidth, manifest.pageHeight, reserveBottom]);
 
   // --- Folds ---------------------------------------------------------------
 
@@ -229,7 +241,8 @@ export default function BibleSpread({
    * Launch a fold. The pages are captured by value here, so the fold keeps
    * rendering them even after the window has slid past.
    */
-  const launchFlight = useCallback((dir, front, back, from, to, duration) => {
+  const launchFlight = useCallback((dir, front, back, from, to, duration, audible = true) => {
+    if (audible) play('pageTurn');
     flightSequence += 1;
     const flight = { id: flightSequence, dir, front, back, from, to, duration };
     setFlights((current) => [...current, flight].slice(-MAX_FLIGHTS));
@@ -251,6 +264,10 @@ export default function BibleSpread({
     },
     [launchFlight, onChangePage, totalPages]
   );
+
+  // Holding a page button keeps turning, like holding an arrow key.
+  const holdPrev = useHoldRepeat(() => turn('prev'));
+  const holdNext = useHoldRepeat(() => turn('next'));
 
   // --- Drag ----------------------------------------------------------------
 
@@ -368,7 +385,9 @@ export default function BibleSpread({
         faces.back,
         angle,
         committed ? (state.dir === 'next' ? -180 : 180) : 0,
-        committed ? 0.34 : 0.26
+        committed ? 0.34 : 0.26,
+        // A leaf let go short of the threshold just settles back: no turn heard.
+        committed
       );
     }
     setDrag(null);
@@ -459,6 +478,7 @@ export default function BibleSpread({
           draggedRef.current = false;
           return;
         }
+        play('select');
         onSelectWord(word);
       }
     : undefined;
@@ -468,14 +488,18 @@ export default function BibleSpread({
   const handleHoverVerse = interactive
     ? (verse) => {
         if (dragRef.current) return;
-        setHovered((current) =>
+        const current = hoveredRef.current;
+        if (
           current &&
           current.book === verse.book &&
           current.chapter === verse.chapter &&
           current.verse === verse.verse
-            ? current
-            : verse
-        );
+        ) {
+          return;
+        }
+        hoveredRef.current = verse;
+        play('hover');
+        setHovered(verse);
       }
     : undefined;
 
@@ -497,14 +521,17 @@ export default function BibleSpread({
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div ref={outerRef} className="flex w-full flex-col items-center gap-3">
       <div
         style={{
           width: spreadWidth * scale,
           height: manifest.pageHeight * scale,
           perspective: 2600,
         }}
-        onPointerLeave={() => setHovered(null)}
+        onPointerLeave={() => {
+          hoveredRef.current = null;
+          setHovered(null);
+        }}
       >
         <div
           className="relative"
@@ -516,9 +543,9 @@ export default function BibleSpread({
             transformStyle: 'preserve-3d',
           }}
         >
-          {/* Leather board visible behind the paper. */}
+          {/* Navy cloth board visible behind the paper. */}
           <div
-            className="absolute -inset-3 rounded-sm bg-leather-800 shadow-2xl shadow-black/60"
+            className="absolute -inset-3 rounded-md bg-wf-navy shadow-[0_18px_30px_-18px_rgba(35,38,43,0.6)]"
             aria-hidden="true"
           />
 
@@ -581,14 +608,41 @@ export default function BibleSpread({
         </div>
       </div>
 
-      {/* No page-turn buttons: turning pages by hand is the game. Arrow keys
-          remain bound, unadvertised, so the book is still navigable without a
-          pointing device. */}
+      {/* Page controls: dragging is still the main way to turn, but the buttons
+          (and the arrow keys) make the book usable without a drag at all. */}
       {interactive && (
-        <p className="text-sm tabular-nums text-parchment-400">
-          Pages {activePage}–{Math.min(activePage + 1, totalPages)} of{' '}
-          {totalPages.toLocaleString()}
-        </p>
+        <div className="mt-2 flex w-full max-w-[940px] items-center gap-3 font-wf">
+          <button
+            type="button"
+            {...holdPrev}
+            disabled={!hasPrev || Boolean(flipTo)}
+            aria-label="Previous pages"
+            data-sound="none"
+            className="flex h-11 flex-[0_0_auto] items-center gap-2 rounded bg-wf-ink pl-3 pr-4 text-[15px] font-bold text-white hover:bg-wf-ink2 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft color="#e3a52b" />
+            <span className="pt-0.5 tabular-nums">
+              {hasPrev ? `${activePage - 2}–${activePage - 1}` : '—'}
+            </span>
+          </button>
+          <p className="m-0 flex-1 text-center text-[15px] font-bold tabular-nums text-wf-ink">
+            Pages {activePage.toLocaleString()}–{Math.min(activePage + 1, totalPages).toLocaleString()}{' '}
+            <span className="font-medium text-wf-muted">of {totalPages.toLocaleString()}</span>
+          </p>
+          <button
+            type="button"
+            {...holdNext}
+            disabled={!hasNext || Boolean(flipTo)}
+            aria-label="Next pages"
+            data-sound="none"
+            className="flex h-11 flex-[0_0_auto] items-center gap-2 rounded bg-wf-ink pl-4 pr-3 text-[15px] font-bold text-white hover:bg-wf-ink2 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="pt-0.5 tabular-nums">
+              {hasNext ? `${activePage + 2}–${Math.min(activePage + 3, totalPages)}` : '—'}
+            </span>
+            <ChevronRight size={16} width={3.5} color="#e3a52b" />
+          </button>
+        </div>
       )}
     </div>
   );

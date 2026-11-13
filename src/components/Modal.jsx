@@ -61,23 +61,19 @@ export default function Modal({ open, onClose, title, children, labelledBy = 'mo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <div className="wf-root fixed inset-0 z-50 flex items-end justify-center bg-transparent sm:items-center sm:p-4">
+      <div className="absolute inset-0 bg-wf-ink/60" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className="panel relative z-10 w-full max-w-md animate-fade-up"
+        className="relative z-10 flex w-full max-w-md animate-wf-rise flex-col gap-[5px] rounded-t-[14px] bg-wf-crimson p-[5px] shadow-[0_30px_60px_-24px_rgba(0,0,0,0.6)] sm:gap-1.5 sm:rounded-lg sm:p-1.5"
       >
-        <h2 id={labelledBy} className="mb-4 font-display text-xl font-bold text-parchment-50">
+        <h2 id={labelledBy} className="wf-tray-heading m-0">
           {title}
         </h2>
-        {children}
+        <div className="rounded bg-wf-crimsonwash px-4 pb-5 pt-4 sm:px-5">{children}</div>
       </div>
     </div>
   );

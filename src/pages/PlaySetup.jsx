@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
+import { Link, useNavigate } from 'react-router-dom';
 import { startGame, friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
+import PageShell, { PageHeading } from '@/components/wf/PageShell';
+import { AlertIcon, ArrowRight, ChevronDown } from '@/components/wf/Icons';
 import {
   POPULARITY_DEFAULT,
   ROUND_COUNT_DEFAULT,
@@ -71,11 +73,17 @@ export default function PlaySetup() {
     );
   }
 
+  function changePopularity(value) {
+    setPopularity(value);
+    play('slide', { value: value / 100 });
+  }
+
   async function handleStart() {
     setError('');
 
     const validated = validateGameSettings({ popularity, rounds, timer });
     if (!validated.ok) {
+      play('error');
       setError(validated.error);
       return;
     }
@@ -88,30 +96,35 @@ export default function PlaySetup() {
       const game = await startGame(validated.value);
       navigate(`/game/${game.gameId}`, { state: { game } });
     } catch (err) {
+      play('error');
       setError(friendlyError(err));
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
+    <PageShell width="max-w-[860px]">
+      <PageHeading crumbs={[{ label: 'Home', to: '/home' }, { label: 'Singleplayer' }]} title="Singleplayer">
+        Set the rules, then open the book.
+      </PageHeading>
 
-      <main className="mx-auto max-w-2xl px-4 py-10">
-        <h1 className="mb-1 font-display text-3xl font-bold text-parchment-50">Singleplayer</h1>
-        <p className="mb-8 text-parchment-300">Set the rules, then open the book.</p>
+      <section aria-label="Game settings" className="wf-tray wf-dark">
+        {/* --- 1. Popularity ------------------------------------------------ */}
+        <SettingRow number={1}>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="popularity" className="flex items-center gap-2.5 text-lg font-extrabold sm:text-xl">
+              <MobileNumber n={1} />
+              Verse popularity
+            </label>
+            <output
+              htmlFor="popularity"
+              className="min-w-[48px] rounded bg-wf-ink px-2 pb-[3px] pt-1.5 text-center text-xl font-extrabold tabular-nums text-wf-amber sm:min-w-[56px] sm:px-2.5 sm:text-[22px]"
+            >
+              {popularity}
+            </output>
+          </div>
 
-        <div className="panel space-y-8 animate-fade-up">
-          {/* --- Popularity --------------------------------------------- */}
-          <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <label htmlFor="popularity" className="field-label mb-0">
-                Verse Popularity
-              </label>
-              <span className="font-display tabular-nums text-lg font-bold text-gilt-400">
-                {popularity}
-              </span>
-            </div>
+          <div className="relative h-11 sm:h-[30px]">
             <input
               id="popularity"
               type="range"
@@ -119,37 +132,58 @@ export default function PlaySetup() {
               max={100}
               step={1}
               value={popularity}
-              onChange={(e) => setPopularity(Number(e.target.value))}
-              className="w-full accent-gilt-500"
+              onChange={(e) => changePopularity(Number(e.target.value))}
               aria-describedby="popularity-help"
+              className="peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer opacity-0"
             />
-            <div className="mt-1 flex justify-between text-xs uppercase tracking-widest text-parchment-400">
-              <span>Random</span>
-              <span>Popular</span>
-            </div>
-            <p id="popularity-help" className="mt-2 text-sm text-parchment-300">
-              {popularityDescription(popularity)}
-            </p>
-          </section>
+            <div aria-hidden="true" className="absolute inset-x-0 top-[17px] h-2.5 rounded-[5px] bg-wf-track sm:top-2.5" />
+            <div
+              aria-hidden="true"
+              className="absolute left-0 top-[17px] h-2.5 rounded-l-[5px] bg-wf-cobalt sm:top-2.5"
+              style={{ width: `${popularity}%` }}
+            />
+            <div
+              aria-hidden="true"
+              className="absolute top-1 -ml-[18px] box-border h-9 w-9 rounded-full border-[3px] border-wf-ink bg-wf-amber transition-transform peer-hover:scale-110 peer-active:scale-110 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-wf-cobalt sm:top-0 sm:-ml-[15px] sm:h-[30px] sm:w-[30px]"
+              style={{ left: `${popularity}%` }}
+            />
+          </div>
 
-          {/* --- Round count -------------------------------------------- */}
-          <section>
-            <span className="field-label" id="rounds-label">
-              Rounds
-            </span>
-            <div className="flex items-center gap-4">
+          <div className="flex justify-between text-sm font-bold text-wf-muted">
+            <span>Random</span>
+            <span>Popular</span>
+          </div>
+          <p id="popularity-help" className="m-0 text-[15px] leading-[1.45] sm:text-base">
+            {popularityDescription(popularity)}
+          </p>
+        </SettingRow>
+
+        {/* --- 2. Rounds ---------------------------------------------------- */}
+        <SettingRow number={2}>
+          <span id="rounds-label" className="flex items-center gap-2.5 text-lg font-extrabold sm:text-xl">
+            <MobileNumber n={2} />
+            Rounds
+          </span>
+          <div
+            role="group"
+            aria-labelledby="rounds-label"
+            className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2.5"
+          >
+            <div className="flex items-stretch">
               <button
                 type="button"
                 onClick={() => stepRounds(-1)}
                 disabled={rounds <= ROUND_COUNT_MIN}
-                className="btn-secondary h-11 w-11 text-xl leading-none"
                 aria-label="One fewer round"
+                data-sound="stepDown"
+                className="h-14 w-16 rounded-l box-border border-2 border-wf-ink bg-wf-ink text-[26px] font-extrabold leading-none text-white hover:border-wf-ink2 hover:bg-wf-ink2 disabled:border-wf-ink disabled:bg-wf-off disabled:text-wf-muted sm:h-[52px] sm:w-[52px] sm:text-2xl"
               >
                 −
               </button>
               <output
                 aria-labelledby="rounds-label"
-                className="w-16 text-center font-display text-3xl font-bold tabular-nums text-parchment-50"
+                aria-live="polite"
+                className="box-border grid flex-1 place-items-center border-y-2 border-wf-ink bg-white pt-[3px] text-[30px] font-extrabold tabular-nums sm:w-[72px] sm:flex-none sm:text-[28px]"
               >
                 {rounds}
               </output>
@@ -157,29 +191,35 @@ export default function PlaySetup() {
                 type="button"
                 onClick={() => stepRounds(1)}
                 disabled={rounds >= ROUND_COUNT_MAX}
-                className="btn-secondary h-11 w-11 text-xl leading-none"
                 aria-label="One more round"
+                data-sound="stepUp"
+                className="h-14 w-16 rounded-r box-border border-2 border-wf-ink bg-wf-ink text-[26px] font-extrabold leading-none text-white hover:border-wf-ink2 hover:bg-wf-ink2 disabled:border-wf-ink disabled:bg-wf-off disabled:text-wf-muted sm:h-[52px] sm:w-[52px] sm:text-2xl"
               >
                 +
               </button>
-              <span className="ml-2 text-sm text-parchment-400">
-                {ROUND_COUNT_MIN}–{ROUND_COUNT_MAX} · up to{' '}
-                {(rounds * 5000).toLocaleString()} points
-              </span>
             </div>
-          </section>
+            <span className="text-sm text-wf-muted sm:text-[15px]">
+              {ROUND_COUNT_MIN}–{ROUND_COUNT_MAX} · up to{' '}
+              <b className="text-wf-ink">{(rounds * 5000).toLocaleString()}</b> points
+            </span>
+          </div>
+        </SettingRow>
 
-          {/* --- Timer --------------------------------------------------- */}
-          <section>
-            <label htmlFor="timer" className="field-label">
-              Round Timer
-            </label>
+        {/* --- 3. Timer ----------------------------------------------------- */}
+        <SettingRow number={3}>
+          <label htmlFor="timer" className="flex items-center gap-2.5 text-lg font-extrabold sm:text-xl">
+            <MobileNumber n={3} />
+            Round timer
+          </label>
+          {/* The border lives on the wrapper, so the arrow block can fill the inside
+              edge exactly — no sliver of white can open up around it. */}
+          <div className="relative box-border flex h-14 overflow-hidden rounded border-2 border-wf-ink bg-white has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-wf-cobalt sm:h-[52px] sm:max-w-[360px]">
             <select
               id="timer"
               value={timer}
               onChange={(e) => setTimer(Number(e.target.value))}
-              className="field-input"
               aria-describedby="timer-help"
+              className="block h-full w-full cursor-pointer appearance-none border-0 bg-transparent pl-3.5 pr-[60px] pt-[3px] font-wf text-[17px] font-bold text-wf-ink focus-visible:outline-none"
             >
               {TIMER_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -187,38 +227,76 @@ export default function PlaySetup() {
                 </option>
               ))}
             </select>
-            <p id="timer-help" className="mt-2 text-sm text-parchment-300">
-              {timer === 0
-                ? `Untimed: take as long as you like on each round. All ${rounds} rounds still apply.`
-                : 'When the clock runs out the round submits automatically and scores zero.'}
-            </p>
-          </section>
-
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/home')}
-              className="btn-secondary flex-1 py-3"
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 grid w-[48px] place-items-center bg-wf-ink sm:w-[44px]"
             >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={handleStart}
-              disabled={busy}
-              className="btn-primary flex-[2] py-3 text-base"
-            >
-              {busy ? 'Drawing verses…' : 'Start Game'}
-            </button>
+              <ChevronDown color="#e3a52b" />
+            </span>
           </div>
+          <p id="timer-help" className="m-0 text-sm leading-[1.45] text-wf-muted sm:text-[15px]">
+            {timer === 0
+              ? `Untimed: take as long as you like on each round. All ${rounds} rounds still apply.`
+              : 'When the clock runs out the round submits automatically and scores zero.'}
+          </p>
+        </SettingRow>
+
+        {error && (
+          <p className="wf-alert-error m-0" role="alert">
+            <AlertIcon />
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col-reverse gap-[5px] sm:flex-row sm:flex-wrap sm:gap-1.5">
+          <Link
+            to="/home"
+            className="wf-btn-mist h-[52px] text-[17px] sm:h-auto sm:flex-[1_1_160px]"
+            style={{ padding: '18px 20px 15px' }}
+          >
+            Back
+          </Link>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={busy}
+            data-sound="submit"
+            className="wf-btn-amber wf-btn-lg h-[60px] sm:h-auto sm:flex-[3_1_320px]"
+          >
+            {busy ? 'Drawing verses…' : 'Start Game'}
+            {!busy && <ArrowRight size={20} color="#23262b" />}
+          </button>
         </div>
-      </main>
+      </section>
+    </PageShell>
+  );
+}
+
+/** One numbered setting: a number tab on desktop, the setting beside it. */
+function SettingRow({ number, children }) {
+  return (
+    <div className="flex items-stretch overflow-hidden rounded bg-wf-mist">
+      <div
+        aria-hidden="true"
+        className="hidden min-h-[72px] flex-[0_0_72px] place-items-center bg-wf-mist2 text-[28px] font-extrabold sm:grid"
+      >
+        {number}
+      </div>
+      <div className="flex flex-1 flex-col gap-3 px-3.5 pb-4 pt-3.5 sm:px-6 sm:pb-5 sm:pt-[18px]">
+        {children}
+      </div>
     </div>
+  );
+}
+
+/** The step number, shown inline on phones where there is no number tab. */
+function MobileNumber({ n }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid h-7 w-7 place-items-center rounded bg-wf-mist2 pt-0.5 text-[15px] sm:hidden"
+    >
+      {n}
+    </span>
   );
 }

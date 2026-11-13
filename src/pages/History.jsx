@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import Navbar from '@/components/Navbar';
-import Spinner from '@/components/Spinner';
 import { db } from '@/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
+import PageShell, { PageHeading, WfSpinner } from '@/components/wf/PageShell';
+import { AlertIcon, ArrowRight } from '@/components/wf/Icons';
 
 const PAGE_SIZE = 50;
 
@@ -21,6 +22,16 @@ function formatTimer(seconds) {
   if (seconds === 0) return 'Untimed';
   if (seconds < 60) return `${seconds}s`;
   return `${seconds / 60} min`;
+}
+
+/** Day of month and short month name, for the date tab on each row. */
+function dateTab(millis) {
+  if (!millis) return { day: '—', month: '' };
+  const date = new Date(millis);
+  return {
+    day: String(date.getDate()),
+    month: date.toLocaleString(undefined, { month: 'short' }),
+  };
 }
 
 export default function History() {
@@ -58,7 +69,10 @@ export default function History() {
           })
         );
       } catch (err) {
-        if (!cancelled) setError(friendlyError(err));
+        if (!cancelled) {
+          play('error');
+          setError(friendlyError(err));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -90,70 +104,88 @@ export default function History() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
+    <PageShell current="history" width="max-w-[1000px]">
+      <PageHeading crumbs={[{ label: 'Home', to: '/home' }, { label: 'Game History' }]} title="Game History">
+        Every game you have finished, newest first.
+      </PageHeading>
 
-      <main className="mx-auto max-w-4xl px-4 py-10">
-        <header className="mb-6">
-          <h1 className="font-display text-3xl font-bold text-parchment-50">Game History</h1>
-          <p className="mt-1 text-parchment-300">Every game you have finished, newest first.</p>
-        </header>
+      {loading && <WfSpinner label="Loading your games" className="py-16" />}
 
-        {loading && <Spinner label="Loading your games" className="py-16" />}
+      {error && (
+        <p className="wf-alert-error" role="alert">
+          <AlertIcon />
+          {error}
+        </p>
+      )}
 
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-
-        {!loading && !error && games.length === 0 && (
-          <div className="panel text-center">
-            <p className="text-parchment-300">You have not finished a game yet.</p>
-            <Link to="/play/setup" className="btn-primary mt-4">
-              Play your first game
+      {!loading && !error && games.length === 0 && (
+        <section className="wf-tray wf-dark">
+          <div className="wf-row flex flex-col items-start gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="m-0 text-lg font-bold">You have not finished a game yet.</p>
+            <Link to="/play/setup" className="wf-btn-amber">
+              Play your first game <ArrowRight size={18} color="#23262b" />
             </Link>
           </div>
-        )}
+        </section>
+      )}
 
-        {games.length > 0 && (
-          <ul className="space-y-3">
+      {games.length > 0 && (
+        <section aria-label="Finished games" className="wf-tray wf-dark">
+          <ul className="m-0 flex list-none flex-col gap-[5px] p-0 sm:gap-1.5">
             {games.map((game) => {
               const percent = game.maxScore
                 ? Math.round((game.totalScore / game.maxScore) * 100)
                 : 0;
+              const tab = dateTab(game.completedAtMs);
+              const settings = `${game.roundCount} ${game.roundCount === 1 ? 'round' : 'rounds'} · ${formatTimer(
+                game.settings?.timer ?? 0
+              )} · popularity ${game.settings?.popularity ?? 50}`;
+
               return (
                 <li key={game.id}>
                   <button
                     type="button"
                     onClick={() => openGame(game)}
-                    className="panel flex w-full items-center gap-4 text-left transition hover:border-gilt-500/60 hover:bg-leather-800/70"
+                    onPointerEnter={() => play('hover')}
+                    className="group flex min-h-[84px] w-full items-stretch overflow-hidden rounded bg-wf-mist text-left text-wf-ink transition-colors hover:bg-white"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-display font-semibold text-parchment-50">
-                        {game.roundCount} {game.roundCount === 1 ? 'round' : 'rounds'} ·{' '}
-                        {formatTimer(game.settings?.timer ?? 0)} · popularity{' '}
-                        {game.settings?.popularity ?? 50}
-                      </p>
-                      <p className="mt-0.5 text-sm text-parchment-400">
-                        {formatDate(game.completedAtMs)}
-                      </p>
+                    <div className="flex flex-[0_0_56px] flex-col items-center justify-center bg-wf-mist2 py-3 sm:flex-[0_0_92px]">
+                      <span className="text-2xl font-extrabold leading-none sm:text-[30px]">{tab.day}</span>
+                      <span className="text-[13px] font-bold text-wf-muted sm:text-sm">{tab.month}</span>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="font-display text-2xl font-bold tabular-nums text-gilt-400">
-                        {game.totalScore?.toLocaleString() ?? 0}
-                      </p>
-                      <p className="text-xs text-parchment-400">
-                        of {game.maxScore?.toLocaleString()} · {percent}%
-                      </p>
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-3 sm:px-6 sm:py-4">
+                      <span className="text-[15px] font-extrabold leading-snug sm:text-xl">{settings}</span>
+                      <span className="text-[13px] text-wf-muted sm:text-[15px]">
+                        {formatDate(game.completedAtMs)}
+                      </span>
+                    </div>
+                    <div className="flex flex-[0_0_auto] items-center gap-[18px] py-3 pl-1 pr-3 sm:py-3.5 sm:pl-6 sm:pr-4">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[21px] font-extrabold leading-[1.05] tabular-nums sm:text-[28px]">
+                          {game.totalScore?.toLocaleString() ?? 0}
+                        </span>
+                        <span className="text-xs tabular-nums text-wf-muted sm:text-sm">
+                          of {game.maxScore?.toLocaleString()}
+                          <span className="hidden sm:inline"> · {percent}%</span>
+                        </span>
+                        <span className="text-[13px] font-extrabold tabular-nums text-wf-cobalt sm:hidden">
+                          {percent}%
+                        </span>
+                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="hidden h-10 w-10 place-items-center rounded bg-wf-ink transition-transform group-hover:translate-x-0.5 sm:grid"
+                      >
+                        <ArrowRight size={18} color="#e3a52b" />
+                      </span>
                     </div>
                   </button>
                 </li>
               );
             })}
           </ul>
-        )}
-      </main>
-    </div>
+        </section>
+      )}
+    </PageShell>
   );
 }

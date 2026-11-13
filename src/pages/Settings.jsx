@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
+import PageShell, { PageHeading } from '@/components/wf/PageShell';
+import { AlertIcon, CheckIcon, ClockIcon, WarningIcon } from '@/components/wf/Icons';
 import {
   validateUsername,
   validatePassword,
@@ -39,6 +41,7 @@ export default function Settings() {
 
     const checked = validateUsername(username);
     if (!checked.ok) {
+      play('error');
       setUsernameState({ error: checked.error, notice: '', busy: false });
       return;
     }
@@ -47,40 +50,43 @@ export default function Settings() {
     try {
       await changeUsername(checked.value);
       setUsername('');
+      play('success');
       setUsernameState({ error: '', notice: `Username changed to ${checked.value}.`, busy: false });
     } catch (err) {
+      play('error');
       setUsernameState({ error: friendlyError(err), notice: '', busy: false });
     }
   }
 
   // --- Password -----------------------------------------------------------
 
+  function passwordError(message) {
+    play('error');
+    setPasswordState({ error: message, notice: '', busy: false });
+  }
+
   async function handlePassword(event) {
     event.preventDefault();
     setPasswordState({ error: '', notice: '', busy: false });
 
     if (!passwords.current) {
-      setPasswordState({ error: 'Enter your current password.', notice: '', busy: false });
+      passwordError('Enter your current password.');
       return;
     }
 
     const checked = validatePassword(passwords.next);
     if (!checked.ok) {
-      setPasswordState({ error: checked.error, notice: '', busy: false });
+      passwordError(checked.error);
       return;
     }
     // Dual confirmation: the new password has to be typed identically twice
     // before it is accepted.
     if (passwords.next !== passwords.confirm) {
-      setPasswordState({ error: 'The two new passwords do not match.', notice: '', busy: false });
+      passwordError('The two new passwords do not match.');
       return;
     }
     if (passwords.next === passwords.current) {
-      setPasswordState({
-        error: 'Your new password must be different from your current one.',
-        notice: '',
-        busy: false,
-      });
+      passwordError('Your new password must be different from your current one.');
       return;
     }
 
@@ -88,9 +94,10 @@ export default function Settings() {
     try {
       await changePassword({ currentPassword: passwords.current, newPassword: passwords.next });
       setPasswords({ current: '', next: '', confirm: '' });
+      play('success');
       setPasswordState({ error: '', notice: 'Password updated.', busy: false });
     } catch (err) {
-      setPasswordState({ error: friendlyError(err), notice: '', busy: false });
+      passwordError(friendlyError(err));
     }
   }
 
@@ -100,6 +107,7 @@ export default function Settings() {
     event.preventDefault();
 
     if (deleteForm.phrase !== CONFIRM_PHRASE) {
+      play('error');
       setDeleteState({ error: `Type ${CONFIRM_PHRASE} to confirm.`, busy: false });
       return;
     }
@@ -109,205 +117,207 @@ export default function Settings() {
       await deleteAccount({ password: deleteForm.password });
       navigate('/', { replace: true });
     } catch (err) {
+      play('error');
       setDeleteState({ error: friendlyError(err), busy: false });
     }
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
+    <PageShell current="settings" width="max-w-[760px]">
+      <PageHeading
+        crumbs={[{ label: 'Home', to: '/home' }, { label: 'Account Settings' }]}
+        title="Account Settings"
+      >
+        {user?.email}
+      </PageHeading>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-10">
-        <header>
-          <h1 className="font-display text-3xl font-bold text-parchment-50">Account Settings</h1>
-          <p className="mt-1 text-parchment-300">{user?.email}</p>
-        </header>
-
-        {/* --- Username -------------------------------------------------- */}
-        <form onSubmit={handleUsername} className="panel space-y-4" noValidate>
-          <div>
-            <h2 className="font-display text-xl font-bold text-parchment-50">Username</h2>
-            <p className="mt-1 text-sm text-parchment-400">
-              Currently{' '}
-              <span className="font-semibold text-parchment-100">
-                {profile?.username ?? 'not set'}
-              </span>
-              . You can change it once every two weeks.
-            </p>
-          </div>
+      {/* --- Username ---------------------------------------------------- */}
+      <section aria-labelledby="sec-username" className="wf-tray wf-dark">
+        <h2 id="sec-username" className="wf-tray-heading m-0">
+          <span aria-hidden="true" className="wf-num">
+            1
+          </span>
+          Username
+        </h2>
+        <form
+          onSubmit={handleUsername}
+          noValidate
+          className="wf-row flex flex-col gap-3.5 px-3.5 pb-[18px] pt-4 sm:gap-4 sm:px-6 sm:pb-[26px] sm:pt-[22px]"
+        >
+          <p className="m-0 text-[15px] leading-[1.45] sm:text-base">
+            Currently <b>{profile?.username ?? 'not set'}</b>. You can change it once every two weeks.
+          </p>
 
           {!cooldown.allowed && (
-            <p className="form-error">
+            <p role="status" className="wf-alert-error m-0">
+              <ClockIcon />
               You can change your username again in {formatDuration(cooldown.remainingMs)}.
             </p>
           )}
-          {usernameState.error && (
-            <p className="form-error" role="alert">
-              {usernameState.error}
-            </p>
-          )}
-          {usernameState.notice && <p className="form-note">{usernameState.notice}</p>}
+          <Notices state={usernameState} />
 
-          <div>
-            <label htmlFor="new-username" className="field-label">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="new-username" className="wf-label">
               New username
             </label>
             <input
               id="new-username"
               type="text"
-              className="field-input"
+              className="wf-input sm:h-12 max-sm:h-[52px]"
               value={username}
               maxLength={20}
               disabled={!cooldown.allowed}
               onChange={(e) => setUsername(e.target.value)}
               aria-describedby="username-rules"
             />
-            <p id="username-rules" className="mt-1 text-xs text-parchment-400/70">
+            <span id="username-rules" className="wf-help">
               3–20 characters. Letters, numbers and underscores only.
-            </p>
+            </span>
           </div>
 
           <button
             type="submit"
-            className="btn-primary"
+            className="wf-btn-amber max-sm:h-[52px] sm:self-start"
             disabled={usernameState.busy || !cooldown.allowed || !username}
           >
             {usernameState.busy ? 'Saving…' : 'Change Username'}
           </button>
         </form>
+      </section>
 
-        {/* --- Password -------------------------------------------------- */}
-        <form onSubmit={handlePassword} className="panel space-y-4" noValidate>
-          <h2 className="font-display text-xl font-bold text-parchment-50">Password</h2>
+      {/* --- Password ---------------------------------------------------- */}
+      <section aria-labelledby="sec-password" className="wf-tray wf-dark">
+        <h2 id="sec-password" className="wf-tray-heading m-0">
+          <span aria-hidden="true" className="wf-num">
+            2
+          </span>
+          Password
+        </h2>
+        <form
+          onSubmit={handlePassword}
+          noValidate
+          className="wf-row flex flex-col gap-4 px-3.5 pb-[18px] pt-4 sm:gap-[18px] sm:px-6 sm:pb-[26px] sm:pt-[22px]"
+        >
+          <Notices state={passwordState} />
 
-          {passwordState.error && (
-            <p className="form-error" role="alert">
-              {passwordState.error}
-            </p>
-          )}
-          {passwordState.notice && <p className="form-note">{passwordState.notice}</p>}
-
-          <div>
-            <label htmlFor="current-password" className="field-label">
-              Current password
-            </label>
+          <Field label="Current password" id="current-password">
             <input
               id="current-password"
               type="password"
               autoComplete="current-password"
-              className="field-input"
+              className="wf-input max-sm:h-[52px]"
               value={passwords.current}
               onChange={(e) => setPasswords((p) => ({ ...p, current: e.target.value }))}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="next-password" className="field-label">
-              New password
-            </label>
+          <Field label="New password" id="next-password" help={PASSWORD_RULE_TEXT} helpId="password-rules">
             <input
               id="next-password"
               type="password"
               autoComplete="new-password"
-              className="field-input"
+              className="wf-input max-sm:h-[52px]"
               value={passwords.next}
               onChange={(e) => setPasswords((p) => ({ ...p, next: e.target.value }))}
               aria-describedby="password-rules"
             />
-            <p id="password-rules" className="mt-1 text-xs text-parchment-400/70">
-              {PASSWORD_RULE_TEXT}
-            </p>
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="confirm-password" className="field-label">
-              Confirm new password
-            </label>
+          <Field label="Confirm new password" id="confirm-password">
             <input
               id="confirm-password"
               type="password"
               autoComplete="new-password"
-              className="field-input"
+              className="wf-input max-sm:h-[52px]"
               value={passwords.confirm}
               onChange={(e) => setPasswords((p) => ({ ...p, confirm: e.target.value }))}
             />
-          </div>
+          </Field>
 
-          <button type="submit" className="btn-primary" disabled={passwordState.busy}>
+          <button
+            type="submit"
+            className="wf-btn-amber max-sm:h-[52px] sm:self-start"
+            disabled={passwordState.busy}
+          >
             {passwordState.busy ? 'Updating…' : 'Change Password'}
           </button>
         </form>
+      </section>
 
-        {/* --- Danger zone ----------------------------------------------- */}
-        <section className="panel border-red-800/40">
-          <h2 className="font-display text-xl font-bold text-red-300">Delete Account</h2>
-          <p className="mt-1 text-sm text-parchment-300">
-            This permanently removes your account, your username and every game in your history.
-            It cannot be undone.
+      {/* --- Danger zone ------------------------------------------------- */}
+      <section
+        aria-labelledby="sec-delete"
+        className="flex flex-col gap-[5px] rounded-lg bg-wf-crimson p-[5px] sm:gap-1.5 sm:p-1.5"
+      >
+        <h2 id="sec-delete" className="wf-tray-heading m-0">
+          <WarningIcon size={24} />
+          Delete Account
+        </h2>
+        <div className="flex flex-col gap-3.5 rounded bg-wf-crimsonwash px-3.5 pb-[18px] pt-4 sm:gap-4 sm:px-6 sm:pb-[26px] sm:pt-[22px]">
+          <p className="m-0 text-[15px] leading-normal sm:text-base">
+            This permanently removes your account, your username and every game in your history. It
+            cannot be undone.
           </p>
-          <button type="button" className="btn-danger mt-4" onClick={() => setDeleteOpen(true)}>
+          <button
+            type="button"
+            className="wf-btn-danger max-sm:h-[52px] sm:self-start"
+            onClick={() => setDeleteOpen(true)}
+            data-sound="menuOpen"
+          >
             Delete Account
           </button>
-        </section>
-      </main>
+        </div>
+      </section>
 
-      <Modal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        title="Delete your account?"
-      >
-        <form onSubmit={handleDelete} className="space-y-4" noValidate>
-          <p className="text-sm text-parchment-300">
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete your account?">
+        <form onSubmit={handleDelete} className="flex flex-col gap-4" noValidate>
+          <p className="m-0 text-[15px] leading-normal">
             Your profile, your username and all{' '}
             {(profile?.stats?.gamesPlayed ?? 0).toLocaleString()} saved games will be erased
             permanently.
           </p>
 
           {deleteState.error && (
-            <p className="form-error" role="alert">
+            <p className="wf-alert-error m-0" role="alert">
+              <AlertIcon />
               {deleteState.error}
             </p>
           )}
 
-          <div>
-            <label htmlFor="delete-password" className="field-label">
-              Your password
-            </label>
+          <Field label="Your password" id="delete-password">
             <input
               id="delete-password"
               type="password"
               autoComplete="current-password"
-              className="field-input"
+              className="wf-input"
               value={deleteForm.password}
               onChange={(e) => setDeleteForm((f) => ({ ...f, password: e.target.value }))}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="delete-phrase" className="field-label">
-              Type {CONFIRM_PHRASE} to confirm
-            </label>
+          <Field label={`Type ${CONFIRM_PHRASE} to confirm`} id="delete-phrase">
             <input
               id="delete-phrase"
               type="text"
-              className="field-input"
+              className="wf-input"
               value={deleteForm.phrase}
               onChange={(e) => setDeleteForm((f) => ({ ...f, phrase: e.target.value }))}
               autoComplete="off"
             />
-          </div>
+          </Field>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
-              className="btn-secondary flex-1"
+              className="wf-btn-mist flex-1"
               onClick={() => setDeleteOpen(false)}
+              data-sound="menuClose"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-danger flex-1"
+              className="wf-btn-danger flex-1"
               disabled={deleteState.busy || deleteForm.phrase !== CONFIRM_PHRASE}
             >
               {deleteState.busy ? 'Deleting…' : 'Delete Forever'}
@@ -315,6 +325,41 @@ export default function Settings() {
           </div>
         </form>
       </Modal>
+    </PageShell>
+  );
+}
+
+function Field({ label, id, help, helpId, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="wf-label">
+        {label}
+      </label>
+      {children}
+      {help && (
+        <span id={helpId} className="wf-help">
+          {help}
+        </span>
+      )}
     </div>
+  );
+}
+
+function Notices({ state }) {
+  return (
+    <>
+      {state.error && (
+        <p className="wf-alert-error m-0" role="alert">
+          <AlertIcon />
+          {state.error}
+        </p>
+      )}
+      {state.notice && (
+        <p className="wf-alert-success m-0" role="status">
+          <CheckIcon />
+          {state.notice}
+        </p>
+      )}
+    </>
   );
 }

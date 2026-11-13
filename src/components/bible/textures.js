@@ -7,7 +7,16 @@ import * as THREE from 'three';
  * file: it keeps the app dependency-free and offline-safe, and the page
  * striations need to be fine and irregular in a way that compresses badly as a
  * bitmap anyway.
+ *
+ * Colours follow the Wayfinding redesign: a navy cloth binding, amber gilt and
+ * cream page edges. Only colour lives here; the book's shape is in
+ * ClosedBible3D and does not depend on any of it.
  */
+
+const NAVY = '#1f3f8f';
+const NAVY_DEEP = '#173375';
+const AMBER = '#e3a52b';
+const TITLE_FONT = '"Overpass", "Helvetica Neue", Arial, sans-serif';
 
 function makeCanvas(width, height) {
   const canvas = document.createElement('canvas');
@@ -28,6 +37,27 @@ function finish(canvas, { repeat } = {}) {
   return texture;
 }
 
+/** Fine woven grain over a flat ground: book cloth rather than leather. */
+function paintCloth(ctx, width, height, ground) {
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 0, width, height);
+
+  // Warp and weft: faint alternating threads in both directions.
+  for (let y = 0; y < height; y += 3) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.025 + Math.random() * 0.025})`;
+    ctx.fillRect(0, y, width, 1);
+  }
+  for (let x = 0; x < width; x += 3) {
+    ctx.fillStyle = `rgba(0, 0, 30, ${0.04 + Math.random() * 0.04})`;
+    ctx.fillRect(x, 0, 1, height);
+  }
+  // A little uneven wear.
+  for (let i = 0; i < 2500; i += 1) {
+    ctx.fillStyle = `rgba(10, 20, 60, ${Math.random() * 0.12})`;
+    ctx.fillRect(Math.random() * width, Math.random() * height, 2, 2);
+  }
+}
+
 /**
  * The fore edge — the face the player actually aims at.
  *
@@ -40,9 +70,9 @@ export function createForeEdgeTexture(leaves = 900) {
   const ctx = canvas.getContext('2d');
 
   const base = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  base.addColorStop(0, '#e8dcc0');
-  base.addColorStop(0.5, '#f3ead6');
-  base.addColorStop(1, '#dccfae');
+  base.addColorStop(0, '#e6dcc2');
+  base.addColorStop(0.5, '#efe6cf');
+  base.addColorStop(1, '#e2d7ba');
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -51,109 +81,100 @@ export function createForeEdgeTexture(leaves = 900) {
     const x = i * step;
     // Irregular darkness per leaf gives the stack its grain; a few much darker
     // lines read as the gaps where sections of the binding meet.
-    const shade = 0.06 + Math.random() * 0.14 + (i % 37 === 0 ? 0.22 : 0);
-    ctx.fillStyle = `rgba(90, 68, 40, ${shade})`;
+    const shade = 0.08 + Math.random() * 0.14 + (i % 37 === 0 ? 0.2 : 0);
+    ctx.fillStyle = `rgba(150, 128, 88, ${shade})`;
     ctx.fillRect(x, 0, Math.max(step * 0.45, 0.6), canvas.height);
   }
 
   // Darken toward the covers, where a closed book compresses.
   const shadow = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  shadow.addColorStop(0, 'rgba(60, 40, 20, 0.45)');
-  shadow.addColorStop(0.06, 'rgba(60, 40, 20, 0)');
-  shadow.addColorStop(0.94, 'rgba(60, 40, 20, 0)');
-  shadow.addColorStop(1, 'rgba(60, 40, 20, 0.45)');
+  shadow.addColorStop(0, 'rgba(60, 50, 30, 0.32)');
+  shadow.addColorStop(0.06, 'rgba(60, 50, 30, 0)');
+  shadow.addColorStop(0.94, 'rgba(60, 50, 30, 0)');
+  shadow.addColorStop(1, 'rgba(60, 50, 30, 0.32)');
   ctx.fillStyle = shadow;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   return finish(canvas);
 }
 
-/** Gilt top and bottom edges. */
+/** Gilt top and bottom edges, in the redesign's amber. */
 export function createGiltEdgeTexture() {
   const canvas = makeCanvas(1024, 128);
   const ctx = canvas.getContext('2d');
 
   const gold = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gold.addColorStop(0, '#8d6a1f');
-  gold.addColorStop(0.35, '#e3c366');
-  gold.addColorStop(0.6, '#f6e3a8');
-  gold.addColorStop(1, '#9c7826');
+  gold.addColorStop(0, '#9a6c12');
+  gold.addColorStop(0.35, AMBER);
+  gold.addColorStop(0.6, '#f4d28a');
+  gold.addColorStop(1, '#a8770f');
   ctx.fillStyle = gold;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (let i = 0; i < 600; i += 1) {
     const x = Math.random() * canvas.width;
-    ctx.fillStyle = `rgba(255, 245, 210, ${Math.random() * 0.35})`;
+    ctx.fillStyle = `rgba(255, 244, 205, ${Math.random() * 0.35})`;
     ctx.fillRect(x, 0, 1, canvas.height);
   }
 
   return finish(canvas);
 }
 
-/** Grained leather, used for the covers and the spine. */
-export function createLeatherTexture() {
+/** Navy book cloth, for the back board. */
+export function createBindingTexture() {
   const canvas = makeCanvas(512, 512);
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#4a2c1a';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  for (let i = 0; i < 9000; i += 1) {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
-    const r = Math.random() * 2.4;
-    ctx.fillStyle =
-      Math.random() > 0.5
-        ? `rgba(96, 60, 34, ${Math.random() * 0.5})`
-        : `rgba(30, 16, 8, ${Math.random() * 0.5})`;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
+  paintCloth(canvas.getContext('2d'), canvas.width, canvas.height, NAVY);
   return finish(canvas, { repeat: [2, 2] });
 }
 
-/** Front cover: leather with a gilt rule and blocked title. */
+/** The spine: the same cloth, a shade deeper, as in the design. */
+export function createSpineTexture() {
+  const canvas = makeCanvas(512, 512);
+  paintCloth(canvas.getContext('2d'), canvas.width, canvas.height, NAVY_DEEP);
+  return finish(canvas, { repeat: [2, 2] });
+}
+
+/** Front cover: navy cloth with a double gilt rule and a blocked title. */
 export function createCoverTexture() {
   const canvas = makeCanvas(768, 1024);
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#46291700';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  function draw() {
+    paintCloth(ctx, canvas.width, canvas.height, NAVY);
 
-  ctx.fillStyle = '#4a2c1a';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < 12000; i += 1) {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
-    ctx.fillStyle =
-      Math.random() > 0.5
-        ? `rgba(102, 64, 36, ${Math.random() * 0.45})`
-        : `rgba(28, 15, 7, ${Math.random() * 0.45})`;
-    ctx.beginPath();
-    ctx.arc(x, y, Math.random() * 2.2, 0, Math.PI * 2);
-    ctx.fill();
+    // Gilt border rules: a heavy outer line and a fine inner one.
+    ctx.strokeStyle = AMBER;
+    ctx.lineWidth = 9;
+    ctx.strokeRect(70, 78, canvas.width - 140, canvas.height - 156);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(96, 104, canvas.width - 192, canvas.height - 208);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = AMBER;
+    ctx.font = `800 82px ${TITLE_FONT}`;
+    ctx.fillText('THE HOLY', canvas.width / 2, 430);
+    ctx.font = `800 128px ${TITLE_FONT}`;
+    ctx.fillText('BIBLE', canvas.width / 2, 556);
+    ctx.font = `600 32px ${TITLE_FONT}`;
+    ctx.fillText('KING JAMES VERSION', canvas.width / 2, 640);
   }
 
-  // Gilt border rule.
-  ctx.strokeStyle = '#c79a3c';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(52, 60, canvas.width - 104, canvas.height - 120);
-  ctx.strokeStyle = 'rgba(199, 154, 60, 0.5)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(70, 78, canvas.width - 140, canvas.height - 156);
+  draw();
+  const texture = finish(canvas);
 
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#d9b45b';
-  ctx.font = 'bold 74px Georgia, "Times New Roman", serif';
-  ctx.fillText('THE HOLY', canvas.width / 2, 420);
-  ctx.font = 'bold 104px Georgia, "Times New Roman", serif';
-  ctx.fillText('BIBLE', canvas.width / 2, 530);
+  // The title is set in Overpass, which may still be loading when the book is
+  // first built; repaint once it arrives rather than keep a fallback face.
+  if (typeof document !== 'undefined' && document.fonts?.load) {
+    Promise.all([
+      document.fonts.load(`800 82px ${TITLE_FONT}`),
+      document.fonts.load(`600 32px ${TITLE_FONT}`),
+    ])
+      .then(() => {
+        draw();
+        texture.needsUpdate = true;
+      })
+      .catch(() => {});
+  }
 
-  ctx.font = '34px Georgia, serif';
-  ctx.fillStyle = 'rgba(217, 180, 91, 0.75)';
-  ctx.fillText('KING JAMES VERSION', canvas.width / 2, 640);
-
-  return finish(canvas);
+  return texture;
 }

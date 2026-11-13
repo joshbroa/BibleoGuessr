@@ -78,9 +78,9 @@ function TextLine({
    *
    * The answer outranks the selection, which outranks the hover. That order
    * only matters when a guess is exactly right and both point at the same
-   * verse — and there, green ("you found it") is the more useful signal than
-   * gold. During a round the answer is never known to the client, so this
-   * costs nothing in play.
+   * verse — and there, the answer's colour ("you found it") is the more useful
+   * signal than the guess's. During a round the answer is never known to the
+   * client, so this costs nothing in play.
    */
   function bandFor(ref) {
     if (inVerse(ref, answer)) return 'is-answer';
@@ -226,7 +226,7 @@ function BiblePage({
           right: manifest.marginX,
           fontSize: manifest.fontSize * 0.72,
           letterSpacing: '0.16em',
-          color: '#6b5c47',
+          color: '#4a4236',
         }}
       >
         <span style={{ fontWeight: isLeft ? 700 : 400 }}>{isLeft ? page.head : page.p}</span>

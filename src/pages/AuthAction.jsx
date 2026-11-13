@@ -10,8 +10,10 @@ import { auth } from '@/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
 import { validatePassword, PASSWORD_RULE_TEXT } from '@shared/validation';
-import Spinner from '@/components/Spinner';
 import { safeContinue } from '@/lib/continueUrl';
+import { play } from '@/lib/sound';
+import { BarShell, Field, FormError, FormTray, TrayPanel } from '@/components/wf/AuthShell';
+import { ArrowRight, CheckIcon, LogoMark, WarningIcon } from '@/components/wf/Icons';
 
 /**
  * The page Firebase's email links land on.
@@ -76,7 +78,8 @@ export default function AuthAction() {
             // already signed in here; a no-op in a browser that is not.
             await refreshUser();
             setHeading('Email confirmed');
-            setMessage('Your address is verified. That is everything — enjoy the game.');
+            setMessage('Your email address is confirmed. You can carry on playing.');
+            play('success');
             setStatus('done');
             break;
           }
@@ -98,6 +101,7 @@ export default function AuthAction() {
               'The change has been undone. If you did not make it, set a new password now — ' +
                 'someone else may know your current one.'
             );
+            play('success');
             setStatus('done');
             break;
           }
@@ -107,6 +111,7 @@ export default function AuthAction() {
             setError('This link is not one we recognise.');
         }
       } catch (err) {
+        play('error');
         setStatus('error');
         setError(friendlyError(err));
       }
@@ -119,10 +124,12 @@ export default function AuthAction() {
 
     const checked = validatePassword(password);
     if (!checked.ok) {
+      play('error');
       setError(checked.error);
       return;
     }
     if (password !== confirm) {
+      play('error');
       setError('Those passwords do not match.');
       return;
     }
@@ -136,121 +143,116 @@ export default function AuthAction() {
           ? `You can now log in as ${email} with your new password.`
           : 'You can now log in with your new password.'
       );
+      play('success');
       setStatus('done');
     } catch (err) {
+      play('error');
       setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
   }
 
+  const button = { paddingTop: 3, paddingBottom: 0 };
+
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm animate-fade-up">
-        <Link
-          to="/"
-          className="mb-8 block text-center font-display text-2xl font-bold text-gilt-400"
-        >
-          Bibleo<span className="text-parchment-100">Guessr</span>
-        </Link>
+    <BarShell className="max-w-[528px] gap-[22px] pb-7 pt-9 sm:gap-[22px] sm:px-6 sm:pb-12 sm:pt-12">
+      <Link to="/" className="inline-flex min-h-[44px] items-center gap-2.5 text-wf-ink no-underline">
+        <LogoMark size={34} />
+        <span className="text-[26px] font-extrabold sm:text-[28px]">BibleoGuessr</span>
+      </Link>
 
-        {status === 'checking' && (
-          <div className="panel flex flex-col items-center gap-4 py-10">
-            <Spinner label="Checking your link" />
-            <p className="text-sm text-parchment-400">Checking your link…</p>
+      {status === 'checking' && (
+        <section aria-label="Checking your link" className="wf-tray wf-dark w-full">
+          <div role="status" className="flex flex-col items-center gap-4 rounded bg-wf-mist px-4 pb-9 pt-10 sm:px-6">
+            <span
+              aria-hidden="true"
+              className="box-border h-11 w-11 animate-spin rounded-full border-[5px] border-wf-off border-r-wf-cobalt border-t-wf-cobalt motion-reduce:[animation-duration:2.4s]"
+            />
+            <span className="text-[17px] font-bold">Checking your link…</span>
           </div>
-        )}
+        </section>
+      )}
 
-        {status === 'form' && (
-          <form onSubmit={handleReset} className="panel space-y-4" noValidate>
-            <h1 className="font-display text-2xl font-bold text-parchment-50">
-              Choose a new password
-            </h1>
+      {status === 'form' && (
+        <FormTray title="Choose a new password" titleId="link-form-h" size="md">
+          <TrayPanel as="form" onSubmit={handleReset} noValidate>
             {email && (
-              <p className="text-sm text-parchment-300">
-                For <span className="text-parchment-100">{email}</span>.
+              <p className="m-0 text-[15px] leading-normal">
+                For <b>{email}</b>.
               </p>
             )}
-
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-
-            <div>
-              <label htmlFor="password" className="field-label">
-                New password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                className="field-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <p className="form-note">{PASSWORD_RULE_TEXT}</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirm" className="field-label">
-                Confirm new password
-              </label>
-              <input
-                id="confirm"
-                type="password"
-                autoComplete="new-password"
-                className="field-input"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
-            </div>
-
-            <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
-              {busy ? 'Saving…' : 'Set New Password'}
+            <FormError>{error}</FormError>
+            <Field
+              id="password"
+              label="New password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              help={PASSWORD_RULE_TEXT}
+            />
+            <Field
+              id="confirm"
+              label="Confirm new password"
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+            />
+            <button type="submit" disabled={busy} className="wf-btn-amber h-14 text-lg" style={button}>
+              {busy ? 'Saving…' : 'Save Password'}
             </button>
-          </form>
-        )}
+          </TrayPanel>
+        </FormTray>
+      )}
 
-        {status === 'done' && (
-          <div className="panel space-y-4">
-            <h1 className="font-display text-2xl font-bold text-parchment-50">{heading}</h1>
-            <p className="text-sm text-parchment-300">{message}</p>
-            <Link to={continueTo} className="btn-primary block w-full py-2.5 text-center">
-              Continue
+      {status === 'done' && (
+        <FormTray
+          title={heading}
+          titleId="link-done-h"
+          size="md"
+          icon={
+            <span aria-hidden="true" className="grid h-8 flex-[0_0_32px] place-items-center rounded bg-wf-cobalt sm:h-[34px] sm:flex-[0_0_34px]">
+              <CheckIcon size={18} color="#ffffff" />
+            </span>
+          }
+        >
+          <TrayPanel className="!gap-3 sm:!gap-3.5">
+            <p className="m-0 text-[15px] leading-normal sm:text-base">{message}</p>
+            <Link to={continueTo} className="wf-btn-amber h-14 text-lg" style={button}>
+              Continue <ArrowRight size={18} color="#23262b" />
             </Link>
             {mode === 'recoverEmail' && (
-              <Link to="/forgot-password" className="btn-secondary block w-full py-2 text-center">
+              <Link to="/forgot-password" className="wf-btn-outline h-[52px] text-[17px]" style={button}>
                 Set a New Password
               </Link>
             )}
-          </div>
-        )}
+          </TrayPanel>
+        </FormTray>
+      )}
 
-        {status === 'error' && (
-          <div className="panel space-y-4">
-            <h1 className="font-display text-2xl font-bold text-parchment-50">
-              This link did not work
-            </h1>
-            <p className="form-error" role="alert">
+      {status === 'error' && (
+        <FormTray title="This link did not work" titleId="link-error-h" size="md" tone="danger" icon={<WarningIcon size={28} />}>
+          <TrayPanel tone="danger" className="!gap-3 sm:!gap-3.5">
+            <p role="alert" className="m-0 text-[15px] font-semibold leading-normal sm:text-base">
               {error}
             </p>
-            <p className="text-sm text-parchment-400">
-              These links expire, and each one can only be used once. Asking for a fresh one
-              almost always sorts it.
+            <p className="m-0 text-[15px] leading-normal sm:text-base">
+              Links stay valid for a limited time, and each one can only be used once. Asking for a fresh
+              one almost always sorts it.
             </p>
-            <Link to="/forgot-password" className="btn-primary block w-full py-2.5 text-center">
+            <Link to="/forgot-password" className="wf-btn-amber h-14 text-lg" style={button}>
               Send a New Link
             </Link>
-            <Link to="/login" className="btn-secondary block w-full py-2 text-center">
+            <Link to="/login" className="wf-btn-outline h-[52px] text-[17px]" style={button}>
               Back to Login
             </Link>
-          </div>
-        )}
-      </div>
-    </main>
+          </TrayPanel>
+        </FormTray>
+      )}
+    </BarShell>
   );
 }

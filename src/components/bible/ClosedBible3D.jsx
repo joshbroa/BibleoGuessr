@@ -5,9 +5,17 @@ import * as THREE from 'three';
 import {
   createForeEdgeTexture,
   createGiltEdgeTexture,
-  createLeatherTexture,
+  createBindingTexture,
+  createSpineTexture,
   createCoverTexture,
 } from './textures';
+import { pageFromU, uFromPage } from '@/lib/pageMath';
+import { play } from '@/lib/sound';
+
+/** The redesign's stage colour, behind the book. */
+const STAGE = '#e6e3db';
+/** The page marker: the redesign's crimson "you are here". */
+const MARKER = '#a8283a';
 
 /* --------------------------------------------------------------------------
  * Book dimensions, in world units.
@@ -46,12 +54,6 @@ const YAW_PER_PIXEL = 0.007;
 
 /** Movement past this many pixels is a rotation, not a page pick. */
 const DRAG_THRESHOLD = 5;
-
-/** Page number under a normalised position across the fore edge. */
-function pageFromU(u, totalPages) {
-  const page = Math.round(1 + u * (totalPages - 1));
-  return Math.min(Math.max(page, 1), totalPages);
-}
 
 /**
  * Read the fore-edge coordinate out of a pointer event.
@@ -128,20 +130,20 @@ function BookBlock({ xStart, xEnd, foreEdge, gilt, onPointerMove, onPointerOut, 
 // Covers
 // ---------------------------------------------------------------------------
 
-function Cover({ side, leather, coverArt }) {
+function Cover({ side, binding, coverArt }) {
   const x = side * (THICKNESS / 2 + COVER / 2);
 
   const materials = useMemo(() => {
-    const plain = new THREE.MeshStandardMaterial({ map: leather, roughness: 0.8 });
+    const plain = new THREE.MeshStandardMaterial({ map: binding, roughness: 0.86 });
 
-    // The back board is plain leather all over, as a real binding is.
+    // The back board is plain cloth all over, as a real binding is.
     if (side > 0) return [plain, plain, plain, plain, plain, plain];
 
     // Only the front board is blocked, and only on its outward (-x) face.
     // BoxGeometry material order: +x, -x, +y, -y, +z, -z.
-    const printed = new THREE.MeshStandardMaterial({ map: coverArt, roughness: 0.72 });
+    const printed = new THREE.MeshStandardMaterial({ map: coverArt, roughness: 0.8 });
     return [plain, printed, plain, plain, plain, plain];
-  }, [leather, coverArt, side]);
+  }, [binding, coverArt, side]);
 
   // The same material instance fills most slots, so dedupe before disposing.
   useEffect(() => () => new Set(materials).forEach((material) => material.dispose()), [materials]);
@@ -153,11 +155,11 @@ function Cover({ side, leather, coverArt }) {
   );
 }
 
-function Spine({ leather }) {
+function Spine({ cloth }) {
   return (
     <mesh position={[0, 0, -(DEPTH / 2 + COVER / 2)]}>
       <boxGeometry args={[THICKNESS + COVER * 2, HEIGHT + OVERHANG * 2, COVER]} />
-      <meshStandardMaterial map={leather} roughness={0.8} />
+      <meshStandardMaterial map={cloth} roughness={0.86} />
     </mesh>
   );
 }
@@ -166,24 +168,47 @@ function Spine({ leather }) {
 // The book
 // ---------------------------------------------------------------------------
 
-function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
+function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage, openRequest }) {
   const baseRef = useRef();
   const leftRef = useRef();
   const rightRef = useRef();
 
   const [splitU, setSplitU] = useState(null);
-  const [markerU, setMarkerU] = useState(null);
+  const [hoverU, setHoverU] = useState(null);
   const opening = splitU !== null;
+  const sliderMode = mode === 'slider';
+  const lastHoverPage = useRef(null);
+
+  // In slider mode the marker follows the slider; otherwise the cursor.
+  const markerU = opening
+    ? splitU
+    : sliderMode
+      ? sliderPage
+        ? uFromPage(sliderPage, totalPages)
+        : null
+      : hoverU;
 
   const foreEdge = useMemo(() => createForeEdgeTexture(), []);
   const gilt = useMemo(() => createGiltEdgeTexture(), []);
-  const leather = useMemo(() => createLeatherTexture(), []);
+  const binding = useMemo(() => createBindingTexture(), []);
+  const spineCloth = useMemo(() => createSpineTexture(), []);
   const coverArt = useMemo(() => createCoverTexture(), []);
 
   useEffect(
-    () => () => [foreEdge, gilt, leather, coverArt].forEach((t) => t.dispose()),
-    [foreEdge, gilt, leather, coverArt]
+    () => () => [foreEdge, gilt, binding, spineCloth, coverArt].forEach((t) => t.dispose()),
+    [foreEdge, gilt, binding, spineCloth, coverArt]
   );
+
+  // Slider mode opens on request (the "Open at page" button) rather than on a
+  // click on the book itself.
+  useEffect(() => {
+    if (!openRequest || opening) return;
+    controls.current.locked = true;
+    play('bookOpen');
+    setSplitU(uFromPage(openRequest.page, totalPages));
+    // Keyed on the request object: each press is a fresh request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
 
   // Hand the yaw group up so the wrapper's drag handler can turn it directly,
   // without a re-render per pointer move.
@@ -241,13 +266,21 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
     event.stopPropagation();
     const u = foreEdgeU(event);
     if (u === null) return;
-    setMarkerU(u);
-    onHover(pageFromU(u, totalPages));
+    const page = pageFromU(u, totalPages);
+    // A dry riffle under the thumb as it crosses the leaves — only when the page
+    // actually changes, so a still cursor is silent.
+    if (page !== lastHoverPage.current) {
+      lastHoverPage.current = page;
+      play('edgeScrub');
+    }
+    setHoverU(u);
+    onHover(page);
   }
 
   function handlePointerOut() {
     if (opening) return;
-    setMarkerU(null);
+    lastHoverPage.current = null;
+    setHoverU(null);
     onHover(null);
   }
 
@@ -267,9 +300,15 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
 
     // Freeze rotation for the rest of the opening animation.
     controls.current.locked = true;
-    setMarkerU(u);
+    play('bookOpen');
     setSplitU(u);
   }
+
+  // In slider mode the book is only turned, never pointed at: the page comes
+  // from the slider beneath it, which is far easier to aim with a thumb.
+  const pick = sliderMode
+    ? {}
+    : { onPointerMove: handlePointerMove, onPointerOut: handlePointerOut, onClick: handleClick };
 
   const splitX = splitU === null ? 0 : -THICKNESS / 2 + splitU * THICKNESS;
   const pivotZ = -DEPTH / 2;
@@ -285,21 +324,19 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
               xEnd={THICKNESS / 2}
               foreEdge={foreEdge}
               gilt={gilt}
-              onPointerMove={handlePointerMove}
-              onPointerOut={handlePointerOut}
-              onClick={handleClick}
+              {...pick}
             />
-            <Cover side={-1} leather={leather} coverArt={coverArt} />
-            <Cover side={1} leather={leather} coverArt={coverArt} />
-            <Spine leather={leather} />
+            <Cover side={-1} binding={binding} coverArt={coverArt} />
+            <Cover side={1} binding={binding} coverArt={coverArt} />
+            <Spine cloth={spineCloth} />
 
             {markerU !== null && (
               <mesh position={[-THICKNESS / 2 + markerU * THICKNESS, 0, DEPTH / 2 + 0.012]}>
-                <boxGeometry args={[0.016, HEIGHT * 1.03, 0.02]} />
+                <boxGeometry args={[0.02, HEIGHT * 1.04, 0.02]} />
                 <meshStandardMaterial
-                  color="#f2d489"
-                  emissive="#c79a3c"
-                  emissiveIntensity={1.6}
+                  color={MARKER}
+                  emissive={MARKER}
+                  emissiveIntensity={0.35}
                   toneMapped={false}
                 />
               </mesh>
@@ -317,7 +354,7 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
                   foreEdge={foreEdge}
                   gilt={gilt}
                 />
-                <Cover side={-1} leather={leather} coverArt={coverArt} />
+                <Cover side={-1} binding={binding} coverArt={coverArt} />
               </group>
             </group>
 
@@ -329,7 +366,7 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
                   foreEdge={foreEdge}
                   gilt={gilt}
                 />
-                <Cover side={1} leather={leather} coverArt={coverArt} />
+                <Cover side={1} binding={binding} coverArt={coverArt} />
               </group>
             </group>
           </>
@@ -347,8 +384,20 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls }) {
  * @param {number} totalPages
  * @param {(page: number|null) => void} onHover fires with the page under the cursor
  * @param {(page: number) => void} onOpen fires once the opening animation lands
+ * @param {'pointer'|'slider'} mode  'pointer' (desktop): point at the page edges
+ *   and click to open. 'slider' (phones): the book can only be turned; the
+ *   page comes from `sliderPage`, and it opens when `openRequest` changes.
+ * @param {number} [sliderPage]       the page the slider is on, for the marker
+ * @param {{page: number}} [openRequest] a fresh object per "open here" press
  */
-export default function ClosedBible3D({ totalPages, onHover, onOpen }) {
+export default function ClosedBible3D({
+  totalPages,
+  onHover,
+  onOpen,
+  mode = 'pointer',
+  sliderPage = null,
+  openRequest = null,
+}) {
   const yawRef = useRef(null);
   const controls = useRef({ dragged: false, locked: false });
   const dragRef = useRef(null);
@@ -422,14 +471,24 @@ export default function ClosedBible3D({ totalPages, onHover, onOpen }) {
         camera={{ position: CAMERA_POSITION, fov: 34 }}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
         gl={{ antialias: true }}
+        // No filmic tone mapping: it brightens and saturates every colour, so
+        // the navy cloth came out a different, punchier blue from the navy in
+        // the page around it. Flat output keeps the textures' real colours.
+        flat
       >
-        <color attach="background" args={['#1a0e07']} />
-        <fog attach="fog" args={['#1a0e07', 10, 18]} />
+        {/* A daylit stage in the page's own stone colour, so the canvas sits
+            flush with the layout around it instead of as a dark box. */}
+        <color attach="background" args={[STAGE]} />
+        <fog attach="fog" args={[STAGE, 12, 20]} />
 
-        <ambientLight intensity={0.55} />
-        <directionalLight position={[-3, 4, 6]} intensity={1.5} color="#fff3d8" />
-        <directionalLight position={[4, 2, 3]} intensity={0.45} color="#c79a3c" />
-        <pointLight position={[0, -2.5, 3]} intensity={0.35} color="#d9b45b" />
+        {/* Balanced so the faces turned toward the light sum to about full
+            strength — the cover reads as the site's navy rather than blown out
+            — while the faces turned away still fall into shade. Neutral white
+            throughout, so no light tints the cloth. */}
+        <ambientLight intensity={0.62} />
+        <directionalLight position={[-3, 4, 6]} intensity={0.78} color="#ffffff" />
+        <directionalLight position={[4, 2, 3]} intensity={0.18} color="#ffffff" />
+
 
         <Book
           totalPages={totalPages}
@@ -437,6 +496,9 @@ export default function ClosedBible3D({ totalPages, onHover, onOpen }) {
           onOpen={onOpen}
           yawRef={yawRef}
           controls={controls}
+          mode={mode}
+          sliderPage={sliderPage}
+          openRequest={openRequest}
         />
       </Canvas>
     </div>

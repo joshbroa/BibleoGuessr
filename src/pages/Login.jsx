@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
 import { validateEmail } from '@shared/validation';
+import AuthShell, { Field, FormError, FormTray, TrayFootnote, TrayLink, TrayPanel } from '@/components/wf/AuthShell';
+import { ArrowRight } from '@/components/wf/Icons';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -18,17 +21,22 @@ export default function Login() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  function fail(message) {
+    play('error');
+    setError(message);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
 
     const checkedEmail = validateEmail(email);
     if (!checkedEmail.ok) {
-      setError(checkedEmail.error);
+      fail(checkedEmail.error);
       return;
     }
     if (!password) {
-      setError('Enter your password.');
+      fail('Enter your password.');
       return;
     }
 
@@ -37,87 +45,64 @@ export default function Login() {
       // The password goes straight from this field to Firebase Auth over HTTPS.
       // It is never sanitised, stored, logged or sent to our own functions.
       await login({ email: checkedEmail.value, password });
+      play('success');
       navigate(location.state?.from ?? '/home', { replace: true });
     } catch (err) {
-      setError(friendlyError(err));
+      fail(friendlyError(err));
       setBusy(false);
     }
   }
 
+  const forgot = (
+    <Link to="/forgot-password" className="text-sm font-bold text-wf-cobalt underline underline-offset-[3px] hover:text-wf-cobaltdeep">
+      Forgot your password?
+    </Link>
+  );
+
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm animate-fade-up">
-        <Link to={backTo} className="btn-secondary mb-4 px-3 py-1.5 text-xs">
-          ← {isAuthenticated ? 'Back to Home' : 'Back'}
-        </Link>
+    <AuthShell backTo={backTo} homeTo={backTo}>
+      <FormTray title="Welcome back" titleId="login-h">
+        <TrayPanel as="form" onSubmit={handleSubmit} noValidate>
+          <FormError>{error}</FormError>
 
-        <Link
-          to={backTo}
-          className="mb-8 block text-center font-display text-2xl font-bold text-gilt-400"
-        >
-          Bibleo<span className="text-parchment-100">Guessr</span>
-        </Link>
+          <Field
+            id="email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <form onSubmit={handleSubmit} className="panel space-y-4" noValidate>
-          <h1 className="font-display text-2xl font-bold text-parchment-50">Welcome back</h1>
-
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div>
-            <label htmlFor="email" className="field-label">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              className="field-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="field-label">
-              Password
-            </label>
-            <input
+          <div className="flex flex-col gap-1.5">
+            <Field
               id="password"
+              label="Password"
               type="password"
               autoComplete="current-password"
-              className="field-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              // Beside the label on desktop; on a phone it moves under the field.
+              labelExtra={<span className="hidden sm:inline">{forgot}</span>}
             />
+            <span className="flex min-h-10 items-center sm:hidden">{forgot}</span>
           </div>
 
-          <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
-            {busy ? 'Signing in…' : 'Login'}
+          <button type="submit" disabled={busy} className="wf-btn-amber h-14 text-lg" style={{ paddingTop: 3, paddingBottom: 0 }}>
+            {busy ? 'Logging in…' : 'Login'}
+            {!busy && (
+              <span className="hidden sm:inline">
+                <ArrowRight size={18} color="#23262b" />
+              </span>
+            )}
           </button>
-
-          <p className="text-center text-sm text-parchment-400">
-            <Link
-              to="/forgot-password"
-              className="text-gilt-400 underline-offset-2 hover:underline"
-            >
-              Forgot your password?
-            </Link>
-          </p>
-
-          <p className="text-center text-sm text-parchment-400">
-            No account?{' '}
-            <Link to="/signup" className="text-gilt-400 underline-offset-2 hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </form>
-      </div>
-    </main>
+        </TrayPanel>
+        <TrayFootnote>
+          No account? <TrayLink to="/signup">Sign up</TrayLink>
+        </TrayFootnote>
+      </FormTray>
+    </AuthShell>
   );
 }

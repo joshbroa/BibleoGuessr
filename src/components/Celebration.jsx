@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
  * `prefers-reduced-motion` — which most confetti libraries do not.
  */
 
-const COLOURS = ['#d9b45b', '#c79a3c', '#f6e3a8', '#a87c26', '#fdfaf3', '#15803d'];
+const COLOURS = ['#e3a52b', '#2753b8', '#a8283a', '#2f6f6b', '#f2f0ea', '#23262b'];
 const PIECES = 140;
 const DURATION_MS = 3400;
 /** px per ms². Tuned so the arc peaks around mid-screen rather than overshooting it. */

@@ -25,3 +25,7 @@ firebase-debug.*.log
 firestore-debug.log
 ui-debug.log
 *.log
+
+# Raw downloaded asset packs. Only the files actually used are copied into
+# public/, with credits; the packs themselves stay out of the repository.
+sounds_downloads/

@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   html,
@@ -13,64 +13,273 @@
     height: 100%;
   }
 
+  /* Every page is a Wayfinding page now: stone paper, charcoal ink, Overpass. */
   body {
-    @apply bg-leather-950 text-parchment-100 font-display antialiased;
-    background-image:
-      radial-gradient(ellipse at 50% -10%, rgba(217, 180, 91, 0.16), transparent 60%),
-      radial-gradient(ellipse at 50% 120%, rgba(74, 44, 26, 0.5), transparent 55%);
-    background-attachment: fixed;
+    @apply bg-wf-paper font-wf text-wf-ink antialiased;
   }
 
   /* Keyboard users must always be able to see where they are; the game binds
      Space to submit, so focus visibility is not cosmetic here. */
   :focus-visible {
-    @apply outline-none ring-2 ring-gilt-400 ring-offset-2 ring-offset-leather-950;
+    outline: 3px solid theme('colors.wf.cobalt');
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5
-           text-sm font-semibold tracking-wide transition
-           disabled:cursor-not-allowed disabled:opacity-50;
+
+  /* ------------------------------------------------------------------------
+     Wayfinding — the redesigned pages.
+     Overpass sits high on its line box, so buttons carry a little more padding
+     on top than below to look optically centred.
+     ---------------------------------------------------------------------- */
+
+  .wf-root {
+    @apply bg-wf-paper font-wf text-wf-ink antialiased;
   }
 
-  .btn-primary {
-    @apply btn bg-gilt-500 text-leather-950 hover:bg-gilt-400
-           active:translate-y-px shadow-lg shadow-gilt-600/20;
+  .wf-root :focus-visible {
+    @apply ring-0 ring-offset-0;
+    outline: 3px solid theme('colors.wf.cobalt');
+    outline-offset: 2px;
   }
 
-  .btn-secondary {
-    @apply btn border border-gilt-600/50 bg-leather-800/60 text-parchment-100
-           hover:border-gilt-500 hover:bg-leather-700/70 active:translate-y-px;
+  /* On charcoal, cobalt disappears; amber does not. Every charcoal surface
+     (header, trays, game bars) carries `wf-dark`. */
+  .wf-root .wf-dark :focus-visible,
+  .wf-root .wf-tray > :focus-visible {
+    outline-color: theme('colors.wf.amber');
   }
 
-  .btn-danger {
-    @apply btn bg-red-800 text-red-50 hover:bg-red-700 active:translate-y-px;
+  .wf-btn {
+    @apply inline-flex select-none items-center justify-center gap-3 rounded font-wf text-base
+           font-extrabold leading-none transition-colors duration-100
+           active:translate-y-px disabled:cursor-not-allowed disabled:bg-wf-off
+           disabled:text-wf-muted disabled:active:translate-y-0;
+    padding: 15px 22px 12px;
   }
 
-  .panel {
-    @apply rounded-xl border border-gilt-600/25 bg-leather-900/70 p-6
-           shadow-xl shadow-black/40 backdrop-blur-sm;
+  .wf-btn-lg {
+    @apply text-lg sm:text-xl;
+    padding: 19px 26px 16px;
   }
 
-  .field-label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-widest text-parchment-400;
+  .wf-btn-amber {
+    @apply wf-btn bg-wf-amber text-wf-ink hover:bg-wf-amberhi;
   }
 
-  .field-input {
-    @apply w-full rounded-md border border-gilt-600/30 bg-leather-950/70 px-3 py-2
-           text-parchment-50 placeholder:text-parchment-400/50
-           focus:border-gilt-500 focus:outline-none focus:ring-1 focus:ring-gilt-500;
+  .wf-btn-ink {
+    @apply wf-btn bg-wf-ink text-white hover:bg-wf-ink2;
   }
 
-  .form-error {
-    @apply rounded-md border border-red-500/40 bg-red-950/50 px-3 py-2 text-sm text-red-200;
+  .wf-btn-cobalt {
+    @apply wf-btn bg-wf-cobalt text-white hover:bg-wf-cobaltdeep;
   }
 
-  .form-note {
-    @apply rounded-md border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200;
+  .wf-btn-mist {
+    @apply wf-btn bg-wf-mist font-bold text-wf-ink hover:bg-wf-mist2;
   }
+
+  .wf-btn-outline {
+    @apply wf-btn border-2 border-wf-ink bg-transparent font-bold text-wf-ink hover:bg-wf-ink/5;
+    padding: 13px 20px 10px;
+  }
+
+  /* Outline button for charcoal surfaces. */
+  .wf-btn-ghost {
+    @apply wf-btn border-2 border-wf-line2 bg-transparent font-bold text-white hover:border-white;
+    padding: 13px 18px 10px;
+  }
+
+  .wf-btn-danger {
+    @apply wf-btn bg-wf-crimson text-white hover:bg-wf-crimsondeep;
+  }
+
+  .wf-label {
+    @apply block text-[15px] font-bold text-wf-ink;
+  }
+
+  .wf-help {
+    @apply text-sm leading-snug text-wf-muted;
+  }
+
+  .wf-input {
+    @apply h-12 w-full rounded border-2 border-wf-ink bg-white px-3.5 font-wf text-base font-medium
+           text-wf-ink placeholder:text-wf-muted/70 focus:border-wf-cobalt
+           disabled:cursor-not-allowed disabled:border-wf-field disabled:bg-wf-fieldoff;
+    padding-top: 3px;
+  }
+
+  .wf-alert-error {
+    @apply flex items-start gap-2.5 rounded border-2 border-wf-crimson bg-wf-crimsontint px-3.5
+           py-2.5 text-[15px] font-semibold leading-snug text-wf-crimsondeep;
+  }
+
+  .wf-alert-success {
+    @apply flex items-start gap-2.5 rounded border-2 border-wf-teal bg-wf-tealtint px-3.5 py-2.5
+           text-[15px] font-semibold leading-snug text-[#1d4744];
+  }
+
+  /* The charcoal "tray" that holds a page's main content in stone-grey rows. */
+  .wf-tray {
+    @apply flex flex-col gap-[5px] rounded-lg bg-wf-ink p-[5px] sm:gap-1.5 sm:p-1.5;
+  }
+
+  .wf-tray-heading {
+    @apply flex items-center gap-2.5 px-2.5 pb-1 pt-2 text-xl font-extrabold text-white sm:gap-3
+           sm:px-4 sm:pb-1.5 sm:pt-2.5 sm:text-[22px];
+  }
+
+  .wf-row {
+    @apply rounded bg-wf-mist text-wf-ink;
+  }
+
+  .wf-num {
+    @apply grid h-7 w-7 shrink-0 place-items-center rounded bg-wf-amber text-[15px] font-extrabold
+           text-wf-ink sm:h-[30px] sm:w-[30px] sm:text-base;
+    padding-top: 2px;
+  }
+
+  .wf-stat {
+    @apply rounded bg-wf-ink2 px-2.5 pb-0.5 pt-1 sm:min-w-[70px] sm:px-3.5 sm:pb-1 sm:pt-1.5;
+  }
+
+  .wf-stat dt {
+    @apply text-xs font-semibold text-wf-ondark2;
+  }
+
+  .wf-stat dd {
+    @apply m-0 text-[19px] font-extrabold leading-tight tabular-nums text-white sm:text-[22px];
+  }
+
+  .wf-kbd {
+    @apply rounded-[3px] bg-wf-ink px-[7px] pb-[3px] pt-[5px] font-wf text-xs font-bold leading-none
+           text-wf-amber;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Policy pages. The text is plain markup; numbering and bullets come from here
+   so the legal wording itself never needs touching.
+   -------------------------------------------------------------------------- */
+.legal-body {
+  counter-reset: legal-section;
+}
+
+.legal-body > p:first-child {
+  margin: 0 0 18px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #23262b;
+}
+
+@media (min-width: 768px) {
+  .legal-body > p:first-child {
+    font-size: 19px;
+  }
+}
+
+.legal-body p {
+  margin: 0 0 16px;
+}
+
+.legal-body h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 36px 0 12px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #23262b;
+  scroll-margin-top: 24px;
+}
+
+.legal-body h2::before {
+  counter-increment: legal-section;
+  content: counter(legal-section);
+  flex: 0 0 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding-top: 2px;
+  border-radius: 4px;
+  background: #23262b;
+  color: #e3a52b;
+  font-size: 15px;
+}
+
+@media (min-width: 768px) {
+  .legal-body h2 {
+    margin: 44px 0 14px;
+    font-size: 26px;
+  }
+  .legal-body h2::before {
+    flex-basis: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+}
+
+.legal-body h3 {
+  margin: 24px 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #23262b;
+}
+
+.legal-body ul {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legal-body li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.legal-body li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: #2753b8;
+}
+
+.legal-body strong {
+  color: #23262b;
+}
+
+.legal-body a {
+  color: #2753b8;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.legal-body a:hover {
+  color: #1f4699;
+}
+
+/* Redesigned pages paint the whole canvas, so overscroll never flashes the old
+   dark background through. Toggled by the page shell. */
+body.wf-body {
+  background-color: #f2f0ea;
+  background-image: none;
+  color: #23262b;
+  color-scheme: light;
+}
+
+body.wf-body-stage {
+  background-color: #e6e3db;
 }
 
 /* ---------------------------------------------------------------------------
@@ -108,16 +317,17 @@
    you are about to pick is what you see. Driven by JS rather than :hover
    because the words of a verse are siblings CSS cannot reach from one another. */
 .scripture .is-hovered {
-  --hl: rgba(199, 154, 60, 0.32);
+  --hl: theme('colors.wf.cobaltwash');
   background-color: var(--hl);
 }
 
 /* `--hl` is read by the inline box-shadow that bridges the gaps between the
-   words of a highlighted verse; it must match the background colour. */
+   words of a highlighted verse; it must match the background colour. Only
+   colours change here — never anything that could move a word. */
 .scripture .is-selected {
-  --hl: theme('colors.gilt.500');
+  --hl: theme('colors.wf.cobalt');
   background-color: var(--hl);
-  color: theme('colors.leather.950');
+  color: theme('colors.wf.amber');
 }
 
 .scripture-verse-num {
@@ -132,9 +342,9 @@
 }
 
 .scripture .is-answer {
-  --hl: #15803d;
+  --hl: theme('colors.wf.amber');
   background-color: var(--hl);
-  color: #f0fdf4;
+  color: theme('colors.wf.ink');
 }
 
 .page-paper {

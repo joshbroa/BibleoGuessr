@@ -10,7 +10,8 @@ import {
 import { Outlet, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getGameState, submitGuess, friendlyError } from '@/lib/api';
 import { loadManifest, spreadStart } from '@/lib/pageCache';
-import { FullPageSpinner } from '@/components/Spinner';
+import { WfFullPageSpinner, LogoHeader, useWfBody } from '@/components/wf/PageShell';
+import { AlertIcon } from '@/components/wf/Icons';
 
 const GameContext = createContext(null);
 
@@ -301,23 +302,35 @@ export function GameProvider() {
   );
 
   if (loading || !manifest) {
-    return <FullPageSpinner label="Opening the book" />;
+    return <WfFullPageSpinner label="Opening the book" stage />;
   }
 
   if (error && !game) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <p className="form-error max-w-md text-center">{error}</p>
-        <button type="button" className="btn-secondary" onClick={() => navigate('/home')}>
-          Return Home
-        </button>
-      </main>
-    );
+    return <GameLoadError message={error} onHome={() => navigate('/home')} />;
   }
 
   return (
     <GameContext.Provider value={value}>
       <Outlet />
     </GameContext.Provider>
+  );
+}
+
+/** A game that could not be loaded at all. */
+function GameLoadError({ message, onHome }) {
+  useWfBody(true);
+  return (
+    <div className="wf-root flex min-h-screen flex-col bg-wf-stage">
+      <LogoHeader />
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-4">
+        <p className="wf-alert-error m-0 max-w-md" role="alert">
+          <AlertIcon />
+          {message}
+        </p>
+        <button type="button" className="wf-btn-ink" onClick={onHome}>
+          Return Home
+        </button>
+      </main>
+    </div>
   );
 }

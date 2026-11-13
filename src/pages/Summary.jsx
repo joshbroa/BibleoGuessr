@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { useLocation, useParams, Link } from 'react-router-dom';
 import ScoreBar from '@/components/ScoreBar';
-import Spinner from '@/components/Spinner';
+import PageShell, { WfSpinner } from '@/components/wf/PageShell';
+import { AlertIcon, ArrowRight, PinIcon } from '@/components/wf/Icons';
 import { getGameSummary, saveGameHistory, friendlyError } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { play } from '@/lib/sound';
 import { MAX_ROUND_SCORE } from '@shared/scoring';
 
 function formatDuration(ms) {
@@ -13,15 +15,14 @@ function formatDuration(ms) {
   return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
 }
 
-function formatDistance(distance) {
+function formatDistance(distance, unit = 'pp') {
   if (distance === null || distance === undefined) return '—';
-  return `${distance.toLocaleString(undefined, { maximumFractionDigits: 1 })} pp`;
+  return `${distance.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${unit}`;
 }
 
 export default function Summary() {
   const { gameId } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const { isRegistered } = useAuth();
 
   // A summary reopened from Game History arrives complete in router state and is
@@ -47,6 +48,7 @@ export default function Summary() {
         const data = await getGameSummary({ gameId });
         if (cancelled) return;
         setSummary(data);
+        play('gameComplete', { force: true });
 
         // Data persistence hook: fire the write as soon as the summary resolves,
         // before the navigation buttons become interactive, so leaving this
@@ -58,7 +60,10 @@ export default function Summary() {
           if (!cancelled) setPersisted(Boolean(saved?.saved));
         }
       } catch (err) {
-        if (!cancelled) setError(friendlyError(err));
+        if (!cancelled) {
+          play('error');
+          setError(friendlyError(err));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -71,20 +76,25 @@ export default function Summary() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Spinner label="Tallying your score" />
-      </main>
+      <PageShell header="logo" footer={false}>
+        <WfSpinner label="Tallying your score" className="flex-1 py-24" />
+      </PageShell>
     );
   }
 
   if (error || !summary) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <p className="form-error max-w-md text-center">{error || 'That game could not be loaded.'}</p>
-        <Link to="/home" className="btn-secondary">
-          Return Home
-        </Link>
-      </main>
+      <PageShell header="logo">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-16">
+          <p className="wf-alert-error m-0 max-w-md" role="alert">
+            <AlertIcon />
+            {error || 'That game could not be loaded.'}
+          </p>
+          <Link to="/home" className="wf-btn-ink">
+            Return Home
+          </Link>
+        </div>
+      </PageShell>
     );
   }
 
@@ -94,122 +104,165 @@ export default function Summary() {
     : 0;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <header className="mb-6 text-center animate-fade-up">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-gilt-500">
-          {archive ? 'Archived game' : 'Game complete'}
-        </p>
-        <h1 className="mt-1 font-display text-4xl font-bold text-parchment-50">
-          {summary.totalScore.toLocaleString()}
-          <span className="text-xl font-normal text-parchment-400">
-            {' '}
-            / {summary.maxScore.toLocaleString()}
+    <PageShell header="logo" width="max-w-[1040px]">
+      <section aria-label="Final score" className="wf-tray wf-dark">
+        <div className="flex flex-col gap-1 px-3 pb-2 pt-3 text-white sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-6 sm:gap-y-2.5 sm:px-[18px] sm:pb-3 sm:pt-4">
+          <div className="flex flex-col gap-1">
+            <span className="flex items-center gap-2 text-sm font-extrabold text-wf-amber sm:text-[15px]">
+              <PinIcon size={14} color="#e3a52b" hole="#23262b" />
+              {archive ? 'Archived game' : 'Game complete'}
+            </span>
+            <h1 className="m-0 font-normal tabular-nums">
+              <b className="text-5xl font-extrabold leading-none sm:text-6xl">
+                {summary.totalScore.toLocaleString()}
+              </b>{' '}
+              <span className="text-xl font-semibold text-wf-ondark sm:text-[26px]">
+                / {summary.maxScore.toLocaleString()}
+              </span>
+            </h1>
+          </div>
+          <span className="text-[15px] font-bold text-wf-ondark sm:text-lg">
+            {percent}% across {rounds.length} {rounds.length === 1 ? 'round' : 'rounds'}
           </span>
-        </h1>
-        <p className="mt-1 text-parchment-300">
-          {percent}% across {rounds.length} {rounds.length === 1 ? 'round' : 'rounds'}
-        </p>
-      </header>
+        </div>
+        <div className="wf-row px-3 pb-3.5 pt-3 sm:px-5 sm:pb-[18px] sm:pt-4">
+          <ScoreBar
+            score={summary.totalScore}
+            max={summary.maxScore}
+            label="Final score"
+            size="lg"
+            durationMs={1500}
+            audible={!archive}
+          />
+        </div>
+      </section>
 
-      <div className="panel mb-6">
-        <ScoreBar
-          score={summary.totalScore}
-          max={summary.maxScore}
-          label="Final score"
-          size="lg"
-          durationMs={1500}
-        />
-      </div>
+      <section aria-labelledby="rounds-heading" className="wf-tray wf-dark">
+        <h2 id="rounds-heading" className="m-0 px-2.5 pb-1 pt-2 text-base font-extrabold text-white sm:sr-only">
+          Round by round
+        </h2>
 
-      <div className="panel mb-6 overflow-x-auto p-0">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <caption className="sr-only">Round-by-round breakdown</caption>
-          <thead>
-            <tr className="border-b border-gilt-600/25 text-[10px] uppercase tracking-widest text-parchment-400">
-              <th scope="col" className="px-4 py-3">
-                Round
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Time
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Your Guess
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Answer
-              </th>
-              <th scope="col" className="px-4 py-3 text-right">
-                Page variance
-              </th>
-              <th scope="col" className="px-4 py-3 text-right">
-                Score
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rounds.map((round, index) => (
-              <tr
-                key={round.round ?? index}
-                className="border-b border-gilt-600/10 last:border-0 hover:bg-leather-800/40"
-              >
-                <th scope="row" className="px-4 py-3 font-display font-bold text-parchment-100">
-                  {(round.round ?? index) + 1}
-                </th>
-                <td className="px-4 py-3 tabular-nums text-parchment-300">
-                  {formatDuration(round.timeTakenMs)}
-                </td>
-                <td className="px-4 py-3 text-parchment-100">
-                  {round.guess ? round.guess.reference : <span className="text-red-300">No guess</span>}
-                </td>
-                <td className="px-4 py-3 text-emerald-300">{round.answer?.reference ?? '—'}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-parchment-300">
-                  {formatDistance(round.distance)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-leather-950">
-                      <div
-                        className="h-full rounded-full bg-gilt-500"
-                        style={{ width: `${(round.score / MAX_ROUND_SCORE) * 100}%` }}
-                      />
-                    </div>
-                    <span className="w-14 font-display font-bold tabular-nums text-gilt-400">
-                      {round.score.toLocaleString()}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        {/* Column labels, desktop only: on phones each row labels itself. */}
+        <div aria-hidden="true" className="hidden gap-4 px-4 pb-1.5 pt-2.5 text-[13px] font-bold text-wf-ondark sm:flex">
+          <span className="flex-[0_0_44px]">Round</span>
+          <span className="flex-[0_0_70px]">Time</span>
+          <span className="flex-[1_1_160px]">Your guess</span>
+          <span className="flex-[1_1_200px]">Answer</span>
+          <span className="flex-[0_0_110px] text-right">Page variance</span>
+          <span className="flex-[0_0_170px] text-right">Score</span>
+        </div>
+
+        <ol className="m-0 flex list-none flex-col gap-[5px] p-0 sm:gap-1.5">
+          {rounds.map((round, index) => (
+            <RoundRow key={round.round ?? index} round={round} number={(round.round ?? index) + 1} />
+          ))}
+        </ol>
+      </section>
 
       {!archive && (
-        <p className="mb-6 text-center text-sm text-parchment-400">
-          {isRegistered
-            ? persisted
-              ? 'Saved to your game history.'
-              : 'Saving to your game history…'
-            : 'Playing as a guest — this game was not saved. Sign up to keep your history.'}
+        <p className="m-0 text-center text-[15px] font-semibold text-wf-muted" role="status">
+          {isRegistered ? (
+            persisted ? (
+              'Saved to your game history.'
+            ) : (
+              'Saving to your game history…'
+            )
+          ) : (
+            <>
+              Playing as a guest — this game was not saved.{' '}
+              <Link to="/signup" className="font-bold text-wf-cobalt underline underline-offset-2">
+                Sign up
+              </Link>{' '}
+              to keep your history.
+            </>
+          )}
         </p>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => navigate('/home')}
-          className="btn-secondary flex-1 py-3"
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
+        <Link
+          to="/home"
+          className="wf-btn-outline h-[52px] text-[17px] sm:h-auto sm:flex-[1_1_200px]"
+          style={{ padding: '16px 20px 13px' }}
         >
           Return Home
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/play/setup')}
-          className="btn-primary flex-1 py-3"
+        </Link>
+        <Link
+          to="/play/setup"
+          className="wf-btn-amber h-[58px] text-[19px] sm:h-auto sm:flex-[2_1_280px]"
+          style={{ padding: '18px 20px 15px' }}
         >
-          Play Again
-        </button>
+          Play Again <ArrowRight size={20} color="#23262b" />
+        </Link>
       </div>
-    </main>
+    </PageShell>
+  );
+}
+
+function RoundRow({ round, number }) {
+  const pct = `${(round.score / MAX_ROUND_SCORE) * 100}%`;
+  const guess = round.guess ? (
+    <b className="font-bold">{round.guess.reference}</b>
+  ) : (
+    <b className="font-bold text-wf-crimson">No guess</b>
+  );
+  const answer = round.answer?.reference ?? '—';
+  const miniBar = (
+    <span aria-hidden="true" className="box-border block h-[9px] w-16 rounded-sm bg-wf-ink p-0.5 sm:h-2.5 sm:w-20">
+      <span className="block h-full rounded-[1px] bg-wf-amber" style={{ width: pct }} />
+    </span>
+  );
+
+  return (
+    <li className="wf-row">
+      {/* Phones: a card per round. */}
+      <div className="flex flex-col gap-2 px-3 pb-2.5 pt-3 sm:hidden">
+        <div className="flex items-start gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-wf-ink pt-0.5 font-extrabold text-white">
+            <span className="sr-only">Round </span>
+            {number}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px] text-[15px]">
+            <span>
+              <span className="inline-block w-[52px] text-xs font-bold text-wf-muted">Guess</span>
+              {guess}
+            </span>
+            <span className="flex items-center">
+              <span className="inline-block w-[52px] text-xs font-bold text-wf-muted">Answer</span>
+              <span aria-hidden="true" className="mr-1.5 h-[9px] w-[9px] shrink-0 rounded-sm bg-wf-amber" />
+              <b className="font-bold">{answer}</b>
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-[5px]">
+            <b className="text-xl font-extrabold leading-none tabular-nums">{round.score.toLocaleString()}</b>
+            {miniBar}
+          </div>
+        </div>
+        <span className="pl-11 text-[13px] text-wf-muted">
+          {formatDuration(round.timeTakenMs)} · {formatDistance(round.distance, 'pages off')}
+        </span>
+      </div>
+
+      {/* Desktop: one row per round, under the column labels. */}
+      <div className="hidden items-center gap-4 px-4 py-2.5 text-base sm:flex">
+        <span className="flex-[0_0_44px]">
+          <span className="box-border grid h-[34px] w-[34px] place-items-center rounded bg-wf-ink pt-0.5 font-extrabold text-white">
+            <span className="sr-only">Round </span>
+            {number}
+          </span>
+        </span>
+        <span className="flex-[0_0_70px] tabular-nums text-wf-muted">{formatDuration(round.timeTakenMs)}</span>
+        <span className="flex-[1_1_160px]">{guess}</span>
+        <span className="flex flex-[1_1_200px] items-center gap-2 font-bold">
+          <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm bg-wf-amber" />
+          {answer}
+        </span>
+        <span className="flex-[0_0_110px] text-right tabular-nums text-wf-muted">{formatDistance(round.distance)}</span>
+        <span className="flex flex-[0_0_170px] items-center justify-end gap-3">
+          {miniBar}
+          <b className="min-w-[54px] text-right font-extrabold tabular-nums">{round.score.toLocaleString()}</b>
+        </span>
+      </div>
+    </li>
   );
 }

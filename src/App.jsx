@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { RequireSession, RequireAccount, RedirectIfSignedIn } from '@/components/RouteGuards';
-import { FullPageSpinner } from '@/components/Spinner';
+import { WfFullPageSpinner } from '@/components/wf/PageShell';
 import { GameProvider } from '@/context/GameContext';
 
 import Landing from '@/pages/Landing';
@@ -25,7 +25,7 @@ const History = lazy(() => import('@/pages/History'));
 
 export default function App() {
   return (
-    <Suspense fallback={<FullPageSpinner label="Loading" />}>
+    <Suspense fallback={<WfFullPageSpinner label="Loading" />}>
       <Routes>
         <Route
           path="/"

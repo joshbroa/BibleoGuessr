@@ -1,15 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BibleoGuessr">
-  <rect width="64" height="64" rx="10" fill="#2a170d"/>
-  <!-- Closed book seen fore-edge on, the way a round begins. -->
-  <rect x="17" y="10" width="30" height="44" rx="2" fill="#4a2c1a"/>
-  <rect x="22" y="12" width="22" height="40" rx="1" fill="#f3ead6"/>
-  <g stroke="#c9b894" stroke-width="1" opacity="0.65">
-    <line x1="26" y1="13" x2="26" y2="51"/>
-    <line x1="30" y1="13" x2="30" y2="51"/>
-    <line x1="34" y1="13" x2="34" y2="51"/>
-    <line x1="38" y1="13" x2="38" y2="51"/>
-    <line x1="42" y1="13" x2="42" y2="51"/>
+  <rect width="64" height="64" rx="12" fill="#23262b"/>
+  <!-- The brand mark: an amber map pin with an open book cut out of it. -->
+  <g transform="translate(6 5) scale(0.82)">
+    <path d="M32 3C18 3 9 13 9 26c0 15 23 35 23 35s23-20 23-35C55 13 46 3 32 3z" fill="#e3a52b"/>
+    <path d="M19 21c5-2.5 9-2.5 13 0v15c-4-2.5-8-2.5-13 0zM32 21c4-2.5 8-2.5 13 0v15c-5-2.5-9-2.5-13 0z" fill="#23262b"/>
   </g>
-  <rect x="17" y="10" width="6" height="44" rx="2" fill="#3a2113"/>
-  <rect x="19" y="27" width="2" height="10" rx="1" fill="#d9b45b"/>
 </svg>

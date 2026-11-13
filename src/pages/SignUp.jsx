@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { checkUsername, friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
 import {
   validateEmail,
   validatePassword,
   validateUsername,
   PASSWORD_RULE_TEXT,
 } from '@shared/validation';
+import AuthShell, { Field, FormError, FormTray, TrayFootnote, TrayLink, TrayPanel } from '@/components/wf/AuthShell';
+import { ArrowRight, NoteIcon } from '@/components/wf/Icons';
+
+const USERNAME_RULE = '3–20 characters. Letters, numbers and underscores only.';
 
 export default function SignUp() {
   const { register, isGuest, isAuthenticated } = useAuth();
@@ -68,21 +73,26 @@ export default function SignUp() {
     return () => clearTimeout(debounce.current);
   }, [form.username]);
 
+  function fail(message) {
+    play('error');
+    setError(message);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
 
     const checkedEmail = validateEmail(form.email);
-    if (!checkedEmail.ok) return setError(checkedEmail.error);
+    if (!checkedEmail.ok) return fail(checkedEmail.error);
 
     const checkedUsername = validateUsername(form.username);
-    if (!checkedUsername.ok) return setError(checkedUsername.error);
+    if (!checkedUsername.ok) return fail(checkedUsername.error);
 
     const checkedPassword = validatePassword(form.password);
-    if (!checkedPassword.ok) return setError(checkedPassword.error);
+    if (!checkedPassword.ok) return fail(checkedPassword.error);
 
     if (form.password !== form.confirmPassword) {
-      return setError('The two passwords do not match.');
+      return fail('The two passwords do not match.');
     }
 
     setBusy(true);
@@ -92,134 +102,87 @@ export default function SignUp() {
         password: form.password,
         username: checkedUsername.value,
       });
+      play('success');
       navigate('/home', { replace: true });
     } catch (err) {
-      setError(friendlyError(err));
+      fail(friendlyError(err));
       setBusy(false);
     }
     return undefined;
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm animate-fade-up">
-        <Link to={backTo} className="btn-secondary mb-4 px-3 py-1.5 text-xs">
-          ← {isAuthenticated ? 'Back to Home' : 'Back'}
-        </Link>
-
-        <Link
-          to={backTo}
-          className="mb-8 block text-center font-display text-2xl font-bold text-gilt-400"
-        >
-          Bibleo<span className="text-parchment-100">Guessr</span>
-        </Link>
-
-        <form onSubmit={handleSubmit} className="panel space-y-4" noValidate>
-          <h1 className="font-display text-2xl font-bold text-parchment-50">Create an account</h1>
-
-          {isGuest && (
-            <p className="form-note">
-              You are playing as a guest. Signing up keeps every game you have already played.
-            </p>
-          )}
-
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div>
-            <label htmlFor="email" className="field-label">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              className="field-input"
-              value={form.email}
-              onChange={(e) => update('email', e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="username" className="field-label">
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              autoComplete="username"
-              className="field-input"
-              value={form.username}
-              onChange={(e) => update('username', e.target.value)}
-              aria-describedby="username-help"
-              maxLength={20}
-              required
-            />
-            <p
-              id="username-help"
-              className={`mt-1 text-xs ${
-                usernameStatus == null
-                  ? 'text-parchment-400/70'
-                  : usernameStatus.ok
-                    ? 'text-emerald-400'
-                    : 'text-red-300'
-              }`}
-              role={usernameStatus?.ok === false ? 'alert' : undefined}
-            >
-              {usernameStatus?.message ?? '3–20 characters. Letters, numbers and underscores only.'}
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="password" className="field-label">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              className="field-input"
-              value={form.password}
-              onChange={(e) => update('password', e.target.value)}
-              aria-describedby="password-help"
-              required
-            />
-            <p id="password-help" className="mt-1 text-xs text-parchment-400/70">
-              {PASSWORD_RULE_TEXT}
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="field-label">
-              Confirm password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              className="field-input"
-              value={form.confirmPassword}
-              onChange={(e) => update('confirmPassword', e.target.value)}
-              required
-            />
-          </div>
-
-          <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
-            {busy ? 'Creating account…' : 'Sign Up'}
-          </button>
-
-          <p className="text-center text-sm text-parchment-400">
-            Already have an account?{' '}
-            <Link to="/login" className="text-gilt-400 underline-offset-2 hover:underline">
-              Login
-            </Link>
+    <AuthShell backTo={backTo} homeTo={backTo} top="sm:pt-12">
+      <FormTray title="Create an account" titleId="signup-h">
+        {isGuest && (
+          <p className="m-0 flex items-start gap-2.5 rounded bg-wf-cobalt px-3 pb-[9px] pt-[11px] text-sm leading-[1.45] text-white sm:px-3.5 sm:pb-2.5 sm:pt-3 sm:text-[15px]">
+            <NoteIcon />
+            You&rsquo;re playing as a guest. Your games so far will carry over to your new account.
           </p>
-        </form>
-      </div>
-    </main>
+        )}
+
+        <TrayPanel as="form" onSubmit={handleSubmit} noValidate>
+          <FormError>{error}</FormError>
+
+          <Field
+            id="email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => update('email', e.target.value)}
+            required
+          />
+
+          <Field
+            id="username"
+            label="Username"
+            type="text"
+            autoComplete="username"
+            value={form.username}
+            onChange={(e) => update('username', e.target.value)}
+            maxLength={20}
+            required
+            help={usernameStatus?.message ?? USERNAME_RULE}
+            helpTone={usernameStatus == null ? 'muted' : usernameStatus.ok ? 'ok' : 'bad'}
+            helpRole={usernameStatus?.ok === false ? 'alert' : undefined}
+          />
+
+          <Field
+            id="password"
+            label="Password"
+            type="password"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(e) => update('password', e.target.value)}
+            required
+            help={PASSWORD_RULE_TEXT}
+          />
+
+          <Field
+            id="confirmPassword"
+            label="Confirm password"
+            type="password"
+            autoComplete="new-password"
+            value={form.confirmPassword}
+            onChange={(e) => update('confirmPassword', e.target.value)}
+            required
+          />
+
+          <button type="submit" disabled={busy} className="wf-btn-amber h-14 text-lg" style={{ paddingTop: 3, paddingBottom: 0 }}>
+            {busy ? 'Creating account…' : 'Sign Up'}
+            {!busy && (
+              <span className="hidden sm:inline">
+                <ArrowRight size={18} color="#23262b" />
+              </span>
+            )}
+          </button>
+        </TrayPanel>
+
+        <TrayFootnote>
+          Already have an account? <TrayLink to="/login">Log in</TrayLink>
+        </TrayFootnote>
+      </FormTray>
+    </AuthShell>
   );
 }

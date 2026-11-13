@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/api';
+import { play } from '@/lib/sound';
 import { validateEmail } from '@shared/validation';
+import AuthShell, { Field, FormError, FormTray, TrayLink, TrayPanel } from '@/components/wf/AuthShell';
+import { MailIcon } from '@/components/wf/Icons';
 
 export default function ForgotPassword() {
   const { requestPasswordReset, isAuthenticated } = useAuth();
@@ -19,6 +22,7 @@ export default function ForgotPassword() {
 
     const checked = validateEmail(email);
     if (!checked.ok) {
+      play('error');
       setError(checked.error);
       return;
     }
@@ -26,8 +30,10 @@ export default function ForgotPassword() {
     setBusy(true);
     try {
       await requestPasswordReset(checked.value);
+      play('success');
       setSent(true);
     } catch (err) {
+      play('error');
       setError(friendlyError(err));
     } finally {
       setBusy(false);
@@ -35,76 +41,58 @@ export default function ForgotPassword() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm animate-fade-up">
-        <Link to={backTo} className="btn-secondary mb-4 px-3 py-1.5 text-xs">
-          ← Back
-        </Link>
-
-        <Link
-          to="/"
-          className="mb-8 block text-center font-display text-2xl font-bold text-gilt-400"
-        >
-          Bibleo<span className="text-parchment-100">Guessr</span>
-        </Link>
-
-        {sent ? (
-          <div className="panel space-y-4">
-            <h1 className="font-display text-2xl font-bold text-parchment-50">Check your email</h1>
-            <p className="form-note">
-              If an account exists for that address, a password reset link is on its way. The
-              link expires after an hour.
-            </p>
-            <p className="text-sm text-parchment-400">
-              Nothing arrived? Check your spam folder, then try again — the message comes from a
-              no-reply address.
-            </p>
-            <Link to="/login" className="btn-primary w-full py-2.5">
+    <AuthShell backTo={backTo} homeTo={isAuthenticated ? '/home' : '/'}>
+      {sent ? (
+        <FormTray title="Check your email" titleId="sent-h">
+          <TrayPanel>
+            <div className="flex items-start gap-3 sm:gap-3.5">
+              <span
+                aria-hidden="true"
+                className="grid h-11 flex-[0_0_44px] place-items-center rounded bg-wf-cobalt sm:h-12 sm:flex-[0_0_48px]"
+              >
+                <MailIcon />
+              </span>
+              {/* Deliberately the same message whether or not the address has an
+                  account: saying otherwise would tell a stranger who is
+                  registered here. */}
+              <p role="status" className="m-0 text-[15px] leading-normal sm:text-base">
+                If an account exists for that address, a reset link is on its way. It can take a minute
+                or two to arrive.
+              </p>
+            </div>
+            <Link to="/login" className="wf-btn-amber h-14 text-lg" style={{ paddingTop: 3, paddingBottom: 0 }}>
               Back to Login
             </Link>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="panel space-y-4" noValidate>
-            <h1 className="font-display text-2xl font-bold text-parchment-50">Reset password</h1>
-            <p className="text-sm text-parchment-300">
-              Enter the email address on your account and we will send you a link to set a new
-              password.
+          </TrayPanel>
+        </FormTray>
+      ) : (
+        <FormTray title="Reset password" titleId="reset-h">
+          <TrayPanel as="form" onSubmit={handleSubmit} noValidate>
+            <p className="m-0 text-[15px] leading-normal sm:text-base">
+              Enter the email you signed up with and we will send you a link to choose a new password.
             </p>
 
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
+            <FormError>{error}</FormError>
 
-            <div>
-              <label htmlFor="email" className="field-label">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="field-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+            <Field
+              id="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
 
-            <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
+            <button type="submit" disabled={busy} className="wf-btn-amber h-14 text-lg" style={{ paddingTop: 3, paddingBottom: 0 }}>
               {busy ? 'Sending…' : 'Send Reset Link'}
             </button>
-
-            <p className="text-center text-sm text-parchment-400">
-              Remembered it?{' '}
-              <Link to="/login" className="text-gilt-400 underline-offset-2 hover:underline">
-                Login
-              </Link>
-            </p>
-          </form>
-        )}
-      </div>
-    </main>
+          </TrayPanel>
+          <p className="m-0 px-3 pb-1.5 pt-1 text-center text-[15px] sm:px-4 sm:pb-3 sm:pt-2.5">
+            <TrayLink to="/login">Back to Login</TrayLink>
+          </p>
+        </FormTray>
+      )}
+    </AuthShell>
   );
 }

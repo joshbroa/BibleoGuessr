@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { FullPageSpinner } from '@/components/Spinner';
+import { WfFullPageSpinner } from '@/components/wf/PageShell';
 
 /**
  * Requires *some* session — an anonymous guest counts. Used for everything
@@ -10,7 +10,7 @@ export function RequireSession({ children }) {
   const { isAuthenticated, initialising } = useAuth();
   const location = useLocation();
 
-  if (initialising) return <FullPageSpinner label="Opening the book" />;
+  if (initialising) return <WfFullPageSpinner label="Opening the book" />;
   if (!isAuthenticated) return <Navigate to="/" replace state={{ from: location.pathname }} />;
   return children;
 }
@@ -24,7 +24,7 @@ export function RequireAccount({ children }) {
   const { isRegistered, isAuthenticated, initialising } = useAuth();
   const location = useLocation();
 
-  if (initialising) return <FullPageSpinner label="Checking your account" />;
+  if (initialising) return <WfFullPageSpinner label="Checking your account" />;
   if (!isAuthenticated) return <Navigate to="/" replace state={{ from: location.pathname }} />;
   if (!isRegistered) return <Navigate to="/signup" replace state={{ from: location.pathname }} />;
   return children;
@@ -37,7 +37,7 @@ export function RequireAccount({ children }) {
 export function RedirectIfSignedIn({ children }) {
   const { isAuthenticated, initialising } = useAuth();
 
-  if (initialising) return <FullPageSpinner label="Loading" />;
+  if (initialising) return <WfFullPageSpinner label="Loading" />;
   if (isAuthenticated) return <Navigate to="/home" replace />;
   return children;
 }
