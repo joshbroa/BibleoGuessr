@@ -32,7 +32,19 @@ export default function Game() {
 
   useWfBody(true);
   const mobile = useIsMobile();
-  const [hoverPage, setHoverPage] = useState(null);
+  // The exact page last opened at. The game state only keeps the spread (the
+  // odd left-hand page), which is all a two-page view needs; the single-page
+  // phone view needs the page itself, or opening at an even page would land
+  // one page early.
+  const [openedPage, setOpenedPage] = useState(null);
+
+  const handleOpen = useCallback(
+    (page) => {
+      setOpenedPage(page);
+      openAt(page);
+    },
+    [openAt]
+  );
 
   const round = game?.round;
 
@@ -79,6 +91,7 @@ export default function Game() {
             seconds={game.settings.timer}
             startedAtMs={round.startedAtMs}
             onExpire={handleExpire}
+            stopped={submitting}
           />
         }
       />
@@ -93,13 +106,9 @@ export default function Game() {
           </p>
         )}
 
-        {!open && !mobile && (
-          <DesktopClosed totalPages={totalPages} hoverPage={hoverPage} onHover={setHoverPage} onOpen={openAt} />
-        )}
-
-        {!open && mobile && (
-          <MobileClosed totalPages={totalPages} activePage={activePage} onOpen={openAt} />
-        )}
+        {/* One way of choosing a page on every screen size: turn the book to
+            look at it, slide along the page edges, open at the slider. */}
+        {!open && <ClosedPicker totalPages={totalPages} activePage={activePage} onOpen={handleOpen} />}
 
         {open && !mobile && (
           <BibleSpread
@@ -115,7 +124,9 @@ export default function Game() {
         {open && mobile && (
           <BibleSinglePage
             manifest={manifest}
-            initialPage={selection?.page ?? activePage}
+            // The page the player just opened at — never the page of an earlier
+            // guess, which would drag them back to it every time they reopened.
+            initialPage={openedPage ?? activePage}
             onChangePage={goToPage}
             selection={selection}
             onSelectWord={selectWord}
@@ -184,7 +195,7 @@ function GameHeader({ mobile, open, roundNumber, roundCount, totalScore, timer }
         {stats}
         <span className="ml-auto hidden items-center gap-2 text-[15px] text-wf-ondark lg:flex">
           {open ? <DragIcon /> : <InfoIcon />}
-          {open ? 'Drag a page sideways to turn it' : 'Click the page edges to open the Bible'}
+          {open ? 'Drag a page sideways to turn it' : 'Slide along the page edges, then open the Bible'}
         </span>
         <SoundToggle className="ml-auto lg:ml-2" />
       </div>
@@ -266,32 +277,12 @@ function VerseBanner({ text, mobile, compact }) {
   );
 }
 
-/** Desktop, book closed: point along the page edges, click to open there. */
-function DesktopClosed({ totalPages, hoverPage, onHover, onOpen }) {
-  return (
-    <>
-      <div className="h-[56vh] min-h-[380px] w-full max-w-6xl">
-        <ClosedBible3D totalPages={totalPages} onHover={onHover} onOpen={onOpen} mode="pointer" />
-      </div>
-      <span
-        aria-live="polite"
-        className="-mt-2 rounded bg-wf-ink px-3.5 pb-[5px] pt-2 text-[17px] font-extrabold tabular-nums text-white"
-      >
-        {hoverPage ? `Page ${hoverPage.toLocaleString()}` : 'Page —'}
-      </span>
-      <p className="m-0 mt-3 text-base text-wf-muted2">
-        Run the cursor along the page edges, then click to open the Bible there.
-      </p>
-    </>
-  );
-}
-
 /**
- * Phones, book closed: the book can be turned to look at, but the page is
- * chosen on a slider shaped like the page edges — far easier with a thumb than
- * tapping a sliver of a 3D model — and opened with a button.
+ * Book closed, on every screen size: the book can be turned to look at, but
+ * the page is chosen on a slider shaped like the page edges — far easier to
+ * aim than a sliver of a 3D model — and opened with a button.
  */
-function MobileClosed({ totalPages, activePage, onOpen }) {
+function ClosedPicker({ totalPages, activePage, onOpen }) {
   const [page, setPage] = useState(() => (activePage > 1 ? activePage : Math.ceil(totalPages / 2)));
   const [openRequest, setOpenRequest] = useState(null);
   const percent = uFromPage(page, totalPages) * 100;
@@ -304,13 +295,11 @@ function MobileClosed({ totalPages, activePage, onOpen }) {
   }
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2.5">
-      <div className="min-h-[150px] w-full flex-1">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2.5 md:max-w-[900px] md:flex-none md:gap-3">
+      <div className="min-h-[150px] w-full flex-1 md:h-[46vh] md:min-h-[320px] md:flex-none">
         <ClosedBible3D
           totalPages={totalPages}
-          onHover={() => {}}
           onOpen={onOpen}
-          mode="slider"
           sliderPage={page}
           openRequest={openRequest}
         />

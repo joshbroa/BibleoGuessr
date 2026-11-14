@@ -24,6 +24,7 @@ import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 import { buildTargets, evaluateGuess } from './lib/game.js';
+import { creditedElapsed } from './lib/timing.js';
 import { getManifest } from './lib/bibleData.js';
 import {
   validateGameSettings,
@@ -45,7 +46,17 @@ const db = getFirestore();
  * function and forgetting the option.
  */
 const MAX_INSTANCES = 10;
-setGlobalOptions({ maxInstances: MAX_INSTANCES });
+
+/**
+ * Where the functions run. Firestore is in the eur3 multi-region (Belgium and
+ * the Netherlands); Cloud Functions cannot run in a multi-region, so they run
+ * in europe-west1 (Belgium), inside it. Every database call is then a short
+ * hop rather than a round trip across the Atlantic. The client must name the
+ * same region — see src/firebase.js.
+ */
+const FUNCTIONS_REGION = 'europe-west1';
+
+setGlobalOptions({ maxInstances: MAX_INSTANCES, region: FUNCTIONS_REGION });
 
 /**
  * Browser origins permitted to call these functions.
@@ -179,10 +190,10 @@ function toClientState(gameId, game) {
 }
 
 /** Milliseconds the player has spent on the current round, per the server clock. */
-function elapsedOnRound(game) {
+function elapsedOnRound(game, now = Date.now()) {
   const startedAt = game.roundStartedAt?.toMillis?.();
   if (!startedAt) return 0;
-  return Math.max(0, Date.now() - startedAt);
+  return Math.max(0, now - startedAt);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +285,9 @@ export const getGameState = onCall(callableOptions, async (request) => {
  * or reordered request cannot answer a round twice or jump ahead.
  */
 export const submitGuess = onCall(callableOptions, async (request) => {
+  // Taken first thing, before the database work, so the transaction's own
+  // latency never counts against the player's clock.
+  const receivedAt = Date.now();
   const uid = requireAuth(request);
   const gameId = requireGameId(request.data?.gameId);
 
@@ -315,7 +329,9 @@ export const submitGuess = onCall(callableOptions, async (request) => {
       throw new HttpsError('failed-precondition', 'That round is no longer in progress.');
     }
 
-    const timeTakenMs = elapsedOnRound(game);
+    // Timed by the player's click, as their browser reports it, credited for
+    // network delay if it falls within a short window (see lib/timing.js).
+    const timeTakenMs = creditedElapsed(elapsedOnRound(game, receivedAt), request.data?.elapsedMs);
 
     // Timer enforcement is server-side. A client that stalls past the limit
     // scores zero whether or not its own countdown fired.

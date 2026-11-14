@@ -80,13 +80,17 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      try {
-        // Creates the /users document on first sign-in, and flips the
-        // `isAnonymous` flag the moment a guest upgrades to a real account.
-        await ensureProfile();
-      } catch (error) {
+      // Creates the /users document on first sign-in, and flips the
+      // `isAnonymous` flag the moment a guest upgrades to a real account.
+      //
+      // Deliberately not awaited. It is a Cloud Function call, and a cold one
+      // can take seconds; waiting for it held every signed-in page on a
+      // spinner. Nothing depends on it finishing first: access is enforced by
+      // the Firestore rules and the functions, never by this call, and the live
+      // subscription below picks the profile up the moment it exists.
+      ensureProfile().catch((error) => {
         console.error('[auth] ensureProfile failed', error);
-      }
+      });
 
       // Live subscription so a username change is reflected everywhere at once.
       profileUnsubscribe.current = onSnapshot(

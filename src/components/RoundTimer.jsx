@@ -21,7 +21,7 @@ const URGENT_MS = 10000;
  * `seconds === 0` means untimed: the countdown is replaced by an infinity
  * symbol and `onExpire` never fires.
  */
-export default function RoundTimer({ seconds, startedAtMs, onExpire }) {
+export default function RoundTimer({ seconds, startedAtMs, onExpire, stopped = false }) {
   const untimed = !seconds;
   const [remaining, setRemaining] = useState(() =>
     untimed ? 0 : Math.max(0, seconds * 1000 - (Date.now() - (startedAtMs ?? Date.now())))
@@ -35,7 +35,9 @@ export default function RoundTimer({ seconds, startedAtMs, onExpire }) {
   }, [startedAtMs]);
 
   useEffect(() => {
-    if (untimed) return undefined;
+    // Frozen once a guess is on its way: the clock shows where it stood at the
+    // click, and cannot run out (and auto-submit) while the request is in flight.
+    if (untimed || stopped) return undefined;
 
     const deadline = (startedAtMs ?? Date.now()) + seconds * 1000;
 
@@ -63,7 +65,7 @@ export default function RoundTimer({ seconds, startedAtMs, onExpire }) {
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [untimed, seconds, startedAtMs, onExpire]);
+  }, [untimed, seconds, startedAtMs, onExpire, stopped]);
 
   if (untimed) {
     return (

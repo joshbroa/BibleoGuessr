@@ -14,6 +14,11 @@ import '@fontsource/overpass/500.css';
 import '@fontsource/overpass/600.css';
 import '@fontsource/overpass/700.css';
 import '@fontsource/overpass/800.css';
+// Tinos is metrically identical to Times New Roman. Phones without Times New
+// Roman (most Android devices) would otherwise substitute a wider serif and
+// words would overrun the fixed widths the typesetter measured for them.
+import '@fontsource/tinos/400.css';
+import '@fontsource/tinos/700.css';
 import '@/index.css';
 
 // Every button and link gets a press sound from one listener, rather than each

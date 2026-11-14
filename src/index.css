@@ -13,6 +13,14 @@
     height: 100%;
   }
 
+  /* Mobile browsers enlarge text they judge too small to read (Android's
+     "font boosting", iOS on rotation). Any enlargement would push the Bible's
+     words past the widths the typesetter measured for them, so it is off. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   /* Every page is a Wayfinding page now: stone paper, charcoal ink, Overpass. */
   body {
     @apply bg-wf-paper font-wf text-wf-ink antialiased;
@@ -290,7 +298,9 @@ body.wf-body-stage {
    the page a player sees is byte-for-byte the page the server scored against.
    -------------------------------------------------------------------------- */
 .scripture {
-  font-family: 'Times New Roman', Times, Georgia, serif;
+  /* Times New Roman where installed; Tinos (same metrics, self-hosted) where
+     not. Never a generic serif: its widths would not match the layout. */
+  font-family: 'Times New Roman', 'Tinos', Times, serif;
   color: theme('colors.ink.900');
   text-rendering: geometricPrecision;
   font-kerning: none;

@@ -201,6 +201,16 @@ export function GameProvider() {
       // it is a deadline, not a forfeit. Only an empty board scores nothing.
       const guess = selection ?? null;
 
+      // How far into the round the click came, by the same clock the player
+      // was watching. The server credits it (within a limit) so a slow network
+      // or a cold start never eats into their time.
+      const startedAtMs = game.round?.startedAtMs;
+      const elapsedMs = timedOut
+        ? game.settings.timer * 1000
+        : startedAtMs
+          ? Math.max(0, Date.now() - startedAtMs)
+          : null;
+
       try {
         const response = await submitGuess({
           gameId,
@@ -208,6 +218,7 @@ export function GameProvider() {
           page: guess ? guess.page : null,
           wordIndex: guess ? guess.wordIndex : null,
           timedOut,
+          elapsedMs,
         });
 
         setLastResult(response);

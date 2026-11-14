@@ -32,7 +32,10 @@ if (missing.length) {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app);
+// Must match FUNCTIONS_REGION in functions/index.js: Belgium, inside the eur3
+// multi-region the database lives in. A mismatch sends every call to a region
+// where the functions do not exist.
+export const functions = getFunctions(app, 'europe-west1');
 
 /**
  * Point the SDK at the local emulator suite when `VITE_USE_EMULATORS=true`.

@@ -48,7 +48,7 @@ export default {
         },
       },
       fontFamily: {
-        scripture: ['"Times New Roman"', 'Times', 'Georgia', 'serif'],
+        scripture: ['"Times New Roman"', 'Tinos', 'Times', 'serif'],
         wf: ['Overpass', '"Helvetica Neue"', 'Arial', 'sans-serif'],
       },
       keyframes: {

@@ -9,7 +9,7 @@ import {
   createSpineTexture,
   createCoverTexture,
 } from './textures';
-import { pageFromU, uFromPage } from '@/lib/pageMath';
+import { uFromPage } from '@/lib/pageMath';
 import { play } from '@/lib/sound';
 
 /** The redesign's stage colour, behind the book. */
@@ -52,19 +52,8 @@ const FACING_YAW = Math.atan2(CAMERA_POSITION[0], CAMERA_POSITION[2]);
 /** Radians of yaw per pixel dragged. A full turn takes roughly a screen width. */
 const YAW_PER_PIXEL = 0.007;
 
-/** Movement past this many pixels is a rotation, not a page pick. */
+/** Movement past this many pixels counts as turning the book. */
 const DRAG_THRESHOLD = 5;
-
-/**
- * Read the fore-edge coordinate out of a pointer event.
- * Returns null when the pointer is on any other face of the book, so the
- * covers, spine and gilt edges are not mistaken for the page stack.
- */
-function foreEdgeU(event) {
-  const normal = event.face?.normal;
-  if (!normal || normal.z < 0.5) return null;
-  return event.uv?.x ?? null;
-}
 
 // ---------------------------------------------------------------------------
 // Half of a split book block
@@ -73,12 +62,12 @@ function foreEdgeU(event) {
 /**
  * One stack of leaves, from `xStart` to `xEnd` across the book's thickness.
  *
- * Before the player clicks, a single half spanning the whole thickness renders
- * the intact book. On click the block is rebuilt as two halves that meet
+ * Until the player opens it, a single half spanning the whole thickness renders
+ * the intact book. On opening the block is rebuilt as two halves that meet
  * exactly at the chosen page — the fore-edge texture is sliced to match, so the
  * swap is invisible — and then swung open about the spine.
  */
-function BookBlock({ xStart, xEnd, foreEdge, gilt, onPointerMove, onPointerOut, onClick }) {
+function BookBlock({ xStart, xEnd, foreEdge, gilt }) {
   const width = xEnd - xStart;
   const centre = (xStart + xEnd) / 2;
 
@@ -114,13 +103,7 @@ function BookBlock({ xStart, xEnd, foreEdge, gilt, onPointerMove, onPointerOut, 
   useEffect(() => () => materials.forEach((material) => material.dispose()), [materials]);
 
   return (
-    <mesh
-      position={[centre, 0, 0]}
-      material={materials}
-      onPointerMove={onPointerMove}
-      onPointerOut={onPointerOut}
-      onClick={onClick}
-    >
+    <mesh position={[centre, 0, 0]} material={materials}>
       <boxGeometry args={[width, HEIGHT, DEPTH]} />
     </mesh>
   );
@@ -168,25 +151,16 @@ function Spine({ cloth }) {
 // The book
 // ---------------------------------------------------------------------------
 
-function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage, openRequest }) {
+function Book({ totalPages, onOpen, yawRef, controls, sliderPage, openRequest }) {
   const baseRef = useRef();
   const leftRef = useRef();
   const rightRef = useRef();
 
   const [splitU, setSplitU] = useState(null);
-  const [hoverU, setHoverU] = useState(null);
   const opening = splitU !== null;
-  const sliderMode = mode === 'slider';
-  const lastHoverPage = useRef(null);
 
-  // In slider mode the marker follows the slider; otherwise the cursor.
-  const markerU = opening
-    ? splitU
-    : sliderMode
-      ? sliderPage
-        ? uFromPage(sliderPage, totalPages)
-        : null
-      : hoverU;
+  // The marker follows the slider beneath the book.
+  const markerU = sliderPage ? uFromPage(sliderPage, totalPages) : null;
 
   const foreEdge = useMemo(() => createForeEdgeTexture(), []);
   const gilt = useMemo(() => createGiltEdgeTexture(), []);
@@ -199,8 +173,7 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
     [foreEdge, gilt, binding, spineCloth, coverArt]
   );
 
-  // Slider mode opens on request (the "Open at page" button) rather than on a
-  // click on the book itself.
+  // The book opens on request (the "Open at page" button), at the slider's page.
   useEffect(() => {
     if (!openRequest || opening) return;
     controls.current.locked = true;
@@ -228,9 +201,8 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
     return () => tween.kill();
   }, []);
 
-  // Deliberately no idle motion. A drifting book looks pretty but it moves the
-  // page edges under a cursor that is trying to settle on a specific page,
-  // which makes aiming feel unreliable. The book holds perfectly still.
+  // Deliberately no idle motion: the book holds still unless the player turns
+  // it, so the marker on the page edges stays where the slider put it.
 
   /**
    * The opening itself: both halves pivot about the spine, at the exact page the
@@ -249,7 +221,9 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
 
     const timeline = gsap.timeline({
       defaults: { duration: 0.85, ease: 'power2.inOut' },
-      onComplete: () => onOpen(pageFromU(splitU, totalPages)),
+      // The requested page itself, not one recovered from the split position,
+      // so the book always opens exactly where the slider said.
+      onComplete: () => onOpen(openRequest.page),
     });
 
     timeline
@@ -259,56 +233,9 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
       .to(baseRef.current.scale, { x: 1.12, y: 1.12, z: 1.12, duration: 0.85 }, 0);
 
     return () => timeline.kill();
+    // openRequest is read for its page only; the split it set is what keys this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opening, splitU, totalPages, onOpen]);
-
-  function handlePointerMove(event) {
-    if (opening) return;
-    event.stopPropagation();
-    const u = foreEdgeU(event);
-    if (u === null) return;
-    const page = pageFromU(u, totalPages);
-    // A dry riffle under the thumb as it crosses the leaves — only when the page
-    // actually changes, so a still cursor is silent.
-    if (page !== lastHoverPage.current) {
-      lastHoverPage.current = page;
-      play('edgeScrub');
-    }
-    setHoverU(u);
-    onHover(page);
-  }
-
-  function handlePointerOut() {
-    if (opening) return;
-    lastHoverPage.current = null;
-    setHoverU(null);
-    onHover(null);
-  }
-
-  function handleClick(event) {
-    if (opening) return;
-
-    // A drag that happened to finish over the page edges was the player turning
-    // the book, not choosing a page.
-    if (controls.current.dragged) {
-      controls.current.dragged = false;
-      return;
-    }
-
-    event.stopPropagation();
-    const u = foreEdgeU(event);
-    if (u === null) return;
-
-    // Freeze rotation for the rest of the opening animation.
-    controls.current.locked = true;
-    play('bookOpen');
-    setSplitU(u);
-  }
-
-  // In slider mode the book is only turned, never pointed at: the page comes
-  // from the slider beneath it, which is far easier to aim with a thumb.
-  const pick = sliderMode
-    ? {}
-    : { onPointerMove: handlePointerMove, onPointerOut: handlePointerOut, onClick: handleClick };
 
   const splitX = splitU === null ? 0 : -THICKNESS / 2 + splitU * THICKNESS;
   const pivotZ = -DEPTH / 2;
@@ -324,7 +251,6 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
               xEnd={THICKNESS / 2}
               foreEdge={foreEdge}
               gilt={gilt}
-              {...pick}
             />
             <Cover side={-1} binding={binding} coverArt={coverArt} />
             <Cover side={1} binding={binding} coverArt={coverArt} />
@@ -381,23 +307,17 @@ function Book({ totalPages, onHover, onOpen, yawRef, controls, mode, sliderPage,
 /**
  * Phase 1 of the game: the closed Bible, seen edge-on.
  *
+ * The book can be turned by dragging, to look at it, but never pointed at:
+ * the page comes from the slider beneath it (`sliderPage`, shown as a marker on
+ * the page edges), and it opens when `openRequest` changes. The same on every
+ * screen size.
+ *
  * @param {number} totalPages
- * @param {(page: number|null) => void} onHover fires with the page under the cursor
  * @param {(page: number) => void} onOpen fires once the opening animation lands
- * @param {'pointer'|'slider'} mode  'pointer' (desktop): point at the page edges
- *   and click to open. 'slider' (phones): the book can only be turned; the
- *   page comes from `sliderPage`, and it opens when `openRequest` changes.
  * @param {number} [sliderPage]       the page the slider is on, for the marker
  * @param {{page: number}} [openRequest] a fresh object per "open here" press
  */
-export default function ClosedBible3D({
-  totalPages,
-  onHover,
-  onOpen,
-  mode = 'pointer',
-  sliderPage = null,
-  openRequest = null,
-}) {
+export default function ClosedBible3D({ totalPages, onOpen, sliderPage = null, openRequest = null }) {
   const yawRef = useRef(null);
   const controls = useRef({ dragged: false, locked: false });
   const dragRef = useRef(null);
@@ -412,11 +332,8 @@ export default function ClosedBible3D({
       target: event.currentTarget,
       captured: false,
     };
-    // Pointer capture is deliberately NOT taken here. While this wrapper holds
-    // the pointer, the browser retargets the following `click` to the wrapper
-    // instead of the canvas — the raycast never runs, and the book can never be
-    // opened. Capture waits until the movement threshold below proves this is a
-    // rotation rather than a page pick.
+    // Pointer capture waits until the movement threshold below proves this is a
+    // deliberate turn, so a stray tap on the book does nothing at all.
   }
 
   function onPointerMove(event) {
@@ -492,11 +409,9 @@ export default function ClosedBible3D({
 
         <Book
           totalPages={totalPages}
-          onHover={onHover}
           onOpen={onOpen}
           yawRef={yawRef}
           controls={controls}
-          mode={mode}
           sliderPage={sliderPage}
           openRequest={openRequest}
         />
