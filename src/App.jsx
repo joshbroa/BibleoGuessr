@@ -22,6 +22,7 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const Privacy = lazy(() => import('@/pages/legal/Privacy'));
 const Terms = lazy(() => import('@/pages/legal/Terms'));
 const History = lazy(() => import('@/pages/History'));
+const Browse = lazy(() => import('@/pages/Browse'));
 
 export default function App() {
   return (
@@ -56,6 +57,23 @@ export default function App() {
           element={
             <RequireSession>
               <Home />
+            </RequireSession>
+          }
+        />
+        {/* Browsing: open to guests too, since it costs nothing and saves nothing. */}
+        <Route
+          path="/browse"
+          element={
+            <RequireSession>
+              <Browse />
+            </RequireSession>
+          }
+        />
+        <Route
+          path="/practice/setup"
+          element={
+            <RequireSession>
+              <PlaySetup practice />
             </RequireSession>
           }
         />

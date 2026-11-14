@@ -250,7 +250,9 @@ export function GameProvider() {
     if (!lastResult) return;
 
     if (lastResult.finished) {
-      navigate(`/game/${gameId}/summary`, { replace: true });
+      // Endless Practice never finishes on its own; should it ever report
+      // finished, it has no summary to show, so it goes Home.
+      navigate(lastResult.mode === 'practice' ? '/home' : `/game/${gameId}/summary`, { replace: true });
       return;
     }
 

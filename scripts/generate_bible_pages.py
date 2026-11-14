@@ -31,6 +31,7 @@ Outputs
 -------
   public/bible_pages/{n}.json          -> client UI (fetched by sliding window cache)
   public/bible_pages/manifest.json     -> layout constants + book names
+  public/bible_pages/contents.json     -> each book's starting page (Browsing)
   functions/src/bible_pages/{n}.json   -> identical copy, read by Cloud Functions
                                           via node fs (no network hop, no client trust)
   functions/src/bible_pages/manifest.json
@@ -491,11 +492,22 @@ def main() -> int:
         "totalVerses": len(verse_pool),
     }
 
+    # The table of contents for Browsing mode: the page each book's text starts
+    # on, i.e. the page holding its first verse's first word. Kept out of the
+    # manifest on purpose: the manifest is cached as immutable, so a new field
+    # there would never reach a browser that already holds the old copy.
+    contents = [
+        {"book": book_names[entry["b"]], "page": entry["p"]}
+        for entry in verse_pool
+        if entry["c"] == 1 and entry["v"] == 1
+    ]
+
     print(f"Writing {total_pages} page files to public/bible_pages ...")
     reset_dir(CLIENT_OUT)
     for page in pages:
         write_json(os.path.join(CLIENT_OUT, f"{page['p']}.json"), page)
     write_json(os.path.join(CLIENT_OUT, "manifest.json"), manifest)
+    write_json(os.path.join(CLIENT_OUT, "contents.json"), contents)
 
     # The backend must never depend on the client for page data, so it gets its
     # own on-disk copy that Cloud Functions read with node fs.

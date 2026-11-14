@@ -23,7 +23,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
-import { buildTargets, evaluateGuess } from './lib/game.js';
+import { buildTargets, evaluateGuess, nextPracticeTargets, PRACTICE_BATCH } from './lib/game.js';
 import { creditedElapsed } from './lib/timing.js';
 import { getManifest } from './lib/bibleData.js';
 import {
@@ -166,24 +166,30 @@ async function loadOwnedGame(gameId, uid) {
 function toClientState(gameId, game) {
   const { settings, results = [], currentRound, status } = game;
   const roundStartedAtMs = game.roundStartedAt?.toMillis?.() ?? null;
+  // Endless Practice keeps only the verses still to come, the current one
+  // first, and a running total instead of every round's result (see
+  // submitGuess). `currentRound` still counts every round played.
+  const practice = game.mode === 'practice';
+  const currentTarget = practice ? game.targets[0] : game.targets[currentRound];
 
   const active =
-    status === 'active' && currentRound < settings.rounds
+    status === 'active' && currentTarget && (practice || currentRound < settings.rounds)
       ? {
           index: currentRound,
-          text: game.targets[currentRound].text,
+          text: currentTarget.text,
           startedAtMs: roundStartedAtMs,
         }
       : null;
 
   return {
     gameId,
+    mode: practice ? 'practice' : 'singleplayer',
     settings,
     status,
     currentRound,
-    roundCount: settings.rounds,
-    totalScore: results.reduce((sum, r) => sum + r.score, 0),
-    maxScore: maxGameScore(settings.rounds),
+    roundCount: practice ? null : settings.rounds,
+    totalScore: practice ? game.practiceScore ?? 0 : results.reduce((sum, r) => sum + r.score, 0),
+    maxScore: practice ? null : maxGameScore(settings.rounds),
     results,
     round: active,
   };
@@ -207,7 +213,12 @@ function elapsedOnRound(game, now = Date.now()) {
 export const startGame = onCall(callableOptions, async (request) => {
   const uid = requireAuth(request);
 
-  const validated = validateGameSettings(request.data);
+  // Endless Practice: the same game, with no round count and nothing recorded.
+  // It has no length to validate, so the batch size stands in for one.
+  const practice = request.data?.mode === 'practice';
+  const validated = validateGameSettings(
+    practice ? { ...request.data, rounds: PRACTICE_BATCH } : request.data
+  );
   if (!validated.ok) {
     throw new HttpsError('invalid-argument', validated.error);
   }
@@ -221,6 +232,7 @@ export const startGame = onCall(callableOptions, async (request) => {
   await ref.set({
     uid,
     isAnonymous: request.auth?.token?.firebase?.sign_in_provider === 'anonymous',
+    mode: practice ? 'practice' : 'singleplayer',
     settings,
     targets,
     results: [],
@@ -228,12 +240,16 @@ export const startGame = onCall(callableOptions, async (request) => {
     status: 'active',
     createdAt: now,
     roundStartedAt: now,
-    historySaved: false,
+    // A practice game starts out marked as "saved", which keeps it out of the
+    // guest-history claim (that only picks up unsaved games). saveGameHistory
+    // also refuses practice games outright.
+    historySaved: practice,
     // Read by the Firestore TTL policy; see GAME_RETENTION_DAYS.
     expiresAt: Timestamp.fromMillis(now.toMillis() + GAME_RETENTION_DAYS * 86400000),
   });
 
   return toClientState(ref.id, {
+    mode: practice ? 'practice' : 'singleplayer',
     settings,
     targets,
     results: [],
@@ -349,7 +365,10 @@ export const submitGuess = onCall(callableOptions, async (request) => {
       timedOut = true;
     }
 
-    const evaluated = evaluateGuess(game.targets[roundIndex], effectiveGuess);
+    const practice = game.mode === 'practice';
+    // Practice keeps its current verse at the head of the queue.
+    const target = practice ? game.targets[0] : game.targets[roundIndex];
+    const evaluated = evaluateGuess(target, effectiveGuess);
     const roundResult = {
       round: roundIndex,
       timeTakenMs,
@@ -357,8 +376,32 @@ export const submitGuess = onCall(callableOptions, async (request) => {
       timedOut: evaluated.timedOut || timedOut,
     };
 
-    const results = [...(game.results ?? []), roundResult];
     const nextRound = roundIndex + 1;
+
+    if (practice) {
+      // Endless Practice: the round just played is dropped from the queue and
+      // its result is not kept — only a running total — so the stored game
+      // stays a handful of verses long and the session never has to end.
+      const totalScore = (game.practiceScore ?? 0) + roundResult.score;
+      tx.update(ref, {
+        targets: nextPracticeTargets(game.targets, game.settings.popularity),
+        practiceScore: totalScore,
+        currentRound: nextRound,
+        roundStartedAt: null,
+      });
+      return {
+        result: roundResult,
+        roundIndex,
+        nextRound,
+        finished: false,
+        totalScore,
+        maxScore: null,
+        roundCount: null,
+        mode: 'practice',
+      };
+    }
+
+    const results = [...(game.results ?? []), roundResult];
     const finished = nextRound >= game.settings.rounds;
 
     tx.update(ref, {
@@ -380,6 +423,7 @@ export const submitGuess = onCall(callableOptions, async (request) => {
       totalScore: results.reduce((sum, r) => sum + r.score, 0),
       maxScore: maxGameScore(game.settings.rounds),
       roundCount: game.settings.rounds,
+      mode: 'singleplayer',
     };
   });
 
@@ -443,6 +487,10 @@ export const saveGameHistory = onCall(callableOptions, async (request) => {
     if (!gameSnap.exists) throw new HttpsError('not-found', 'That game does not exist.');
     const game = gameSnap.data();
     if (game.uid !== uid) throw new HttpsError('permission-denied', 'That game belongs to someone else.');
+    // Endless Practice is never recorded: no history entry, no stats.
+    if (game.mode === 'practice') {
+      return { saved: false, reason: 'practice' };
+    }
     if (game.status !== 'complete') {
       throw new HttpsError('failed-precondition', 'That game is not finished yet.');
     }
@@ -518,6 +566,7 @@ export const claimGuestHistory = onCall(callableOptions, async (request) => {
 
   for (const doc of snapshot.docs) {
     const game = doc.data();
+    if (game.mode === 'practice') continue; // never recorded
     if (!Array.isArray(game.results) || !game.results.length) continue;
 
     const totalScore = game.results.reduce((sum, round) => sum + round.score, 0);

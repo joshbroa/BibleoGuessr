@@ -55,7 +55,10 @@ function findPython() {
 
 /** Does a complete set of generated page data already exist? */
 function pageDataLooksComplete() {
-  for (const file of [MANIFEST, FUNCTIONS_MANIFEST, VERSE_POOL]) {
+  // contents.json arrived after the rest, so data generated before it counts
+  // as missing and is rebuilt.
+  const CONTENTS = path.join(path.dirname(MANIFEST), 'contents.json');
+  for (const file of [MANIFEST, FUNCTIONS_MANIFEST, VERSE_POOL, CONTENTS]) {
     if (!existsSync(file)) return false;
   }
   try {

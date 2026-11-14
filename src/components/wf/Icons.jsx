@@ -203,10 +203,10 @@ export function SpeakerIcon({ on, size = 20, color = '#e3a52b' }) {
 
 /* --- Game-mode glyphs ---------------------------------------------------- */
 
-export function ModeSingle({ size = 76, hole = '#1f4699' }) {
+export function ModeSingle({ size = 76, hole = '#1f4699', color = '#e3a52b' }) {
   return (
     <svg aria-hidden="true" width={size} height={size} viewBox="0 0 64 64" className="shrink-0">
-      <circle cx="32" cy="32" r="26" fill="#e3a52b" />
+      <circle cx="32" cy="32" r="26" fill={color} />
       <circle cx="32" cy="32" r="10" fill={hole} />
     </svg>
   );
@@ -232,10 +232,25 @@ export function ModeMultiplayer({ size = 44 }) {
   );
 }
 
-export function ModeBrowsing({ size = 46 }) {
+export function ModeBrowsing({ size = 46, color = '#b07d14' }) {
   return (
     <svg aria-hidden="true" width={size} height={size} viewBox="0 0 64 64" className="shrink-0">
-      <path d="M8 18c8-4 16-4 24 0v32c-8-4-16-4-24 0zM32 18c8-4 16-4 24 0v32c-8-4-16-4-24 0z" fill="#b07d14" />
+      <path d="M8 18c8-4 16-4 24 0v32c-8-4-16-4-24 0zM32 18c8-4 16-4 24 0v32c-8-4-16-4-24 0z" fill={color} />
+    </svg>
+  );
+}
+
+/** Endless Practice: an unbroken loop. */
+export function ModePractice({ size = 46, color = '#2753b8' }) {
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 64 64" className="shrink-0">
+      <path
+        d="M32 32c-5-7-9-11-15-11a11 11 0 000 22c6 0 10-4 15-11s9-11 15-11a11 11 0 010 22c-6 0-10-4-15-11z"
+        fill="none"
+        stroke={color}
+        strokeWidth="7"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

@@ -52,7 +52,7 @@ export default function LegalLayout({ title, children }) {
         <a
           key={item.id}
           href={`#${item.id}`}
-          className="box-border flex min-h-[44px] items-center gap-2.5 rounded bg-wf-mist px-2.5 py-1.5 text-[15px] font-bold leading-tight text-wf-ink no-underline hover:bg-white md:min-h-10 md:text-sm"
+          className="box-border flex min-h-[44px] items-center gap-2.5 rounded bg-wf-mist px-2.5 py-1.5 text-[15px] font-bold leading-tight text-wf-ink no-underline hover:bg-white lg:min-h-10 lg:text-sm"
         >
           <span
             aria-hidden="true"
@@ -74,7 +74,7 @@ export default function LegalLayout({ title, children }) {
           <button
             type="button"
             onClick={goBack}
-            className="box-border inline-flex h-11 items-center gap-2 rounded border-2 border-wf-line px-3 text-[15px] font-bold text-white md:hidden"
+            className="box-border inline-flex h-11 items-center gap-2 rounded border-2 border-wf-line px-3 text-[15px] font-bold text-white lg:hidden"
           >
             <ArrowLeft size={15} color="#e3a52b" />
             <span className="pt-0.5">Back</span>
@@ -83,7 +83,7 @@ export default function LegalLayout({ title, children }) {
       />
 
       <div className="mx-auto box-border flex w-full max-w-[1160px] flex-1 flex-wrap items-start gap-x-14 gap-y-8 px-4 pb-10 pt-[22px] md:px-8 md:pb-16 md:pt-8">
-        <aside className="sticky top-6 hidden flex-[0_0_250px] flex-col gap-3.5 md:flex">
+        <aside className="sticky top-6 hidden flex-[0_0_250px] flex-col gap-3.5 lg:flex">
           <button
             type="button"
             onClick={goBack}
@@ -109,7 +109,7 @@ export default function LegalLayout({ title, children }) {
             </span>
           </p>
 
-          <details className="wf-dark mb-[22px] rounded-md bg-wf-ink p-1 md:hidden">
+          <details className="wf-dark mb-[22px] rounded-md bg-wf-ink p-1 lg:hidden">
             <summary className="flex h-11 cursor-pointer list-none items-center justify-between px-3 text-[15px] font-bold text-white [&::-webkit-details-marker]:hidden">
               On this page
               <ChevronDown size={14} color="#e3a52b" />

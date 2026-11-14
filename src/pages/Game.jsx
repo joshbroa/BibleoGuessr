@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useGame } from '@/context/GameContext';
-import ClosedBible3D from '@/components/bible/ClosedBible3D';
+import ClosedPicker from '@/components/bible/ClosedPicker';
 import BibleSpread from '@/components/bible/BibleSpread';
 import BibleSinglePage from '@/components/bible/BibleSinglePage';
 import RoundTimer from '@/components/RoundTimer';
 import SoundToggle from '@/components/wf/SoundToggle';
+import HomeButton from '@/components/wf/HomeButton';
 import { useWfBody } from '@/components/wf/PageShell';
-import { AlertIcon, ChevronDown, DragIcon, InfoIcon, LogoMark, OpenBookIcon, PinIcon } from '@/components/wf/Icons';
+import { AlertIcon, ChevronDown, DragIcon, InfoIcon, LogoMark, PinIcon } from '@/components/wf/Icons';
 import { useIsMobile } from '@/lib/useMediaQuery';
-import { uFromPage } from '@/lib/pageMath';
 import { play } from '@/lib/sound';
 
 export default function Game() {
@@ -67,8 +67,10 @@ export default function Game() {
     submit({ timedOut: true });
   }, [submit]);
 
+  // Practice has no summary: a finished practice session goes back Home.
+  const practice = game?.mode === 'practice';
   if (game?.status === 'complete' && !round) {
-    return <Navigate to={`/game/${gameId}/summary`} replace />;
+    return <Navigate to={practice ? '/home' : `/game/${gameId}/summary`} replace />;
   }
   if (!round) {
     return <Navigate to="/home" replace />;
@@ -85,6 +87,7 @@ export default function Game() {
         open={open}
         roundNumber={round.index + 1}
         roundCount={game.roundCount}
+        practice={practice}
         totalScore={game.totalScore ?? 0}
         timer={
           <RoundTimer
@@ -108,7 +111,7 @@ export default function Game() {
 
         {/* One way of choosing a page on every screen size: turn the book to
             look at it, slide along the page edges, open at the slider. */}
-        {!open && <ClosedPicker totalPages={totalPages} activePage={activePage} onOpen={handleOpen} />}
+        {!open && <ClosedPicker totalPages={totalPages} activePage={activePage} initialPage={openedPage} onOpen={handleOpen} />}
 
         {open && !mobile && (
           <BibleSpread
@@ -148,13 +151,15 @@ export default function Game() {
 
 // ---------------------------------------------------------------------------
 
-function GameHeader({ mobile, open, roundNumber, roundCount, totalScore, timer }) {
+function GameHeader({ mobile, open, roundNumber, roundCount, totalScore, timer, practice = false }) {
   const stats = (
     <dl className="m-0 grid flex-1 grid-cols-3 gap-[5px] md:flex md:flex-none md:gap-1.5">
       <div className="wf-stat">
         <dt>Round</dt>
         <dd>
-          {roundNumber} <span className="font-semibold text-wf-ondark2">/ {roundCount}</span>
+          {roundNumber}
+          {/* Practice is endless, so there is no "of N". */}
+          {!practice && <span className="font-semibold text-wf-ondark2"> / {roundCount}</span>}
         </dd>
       </div>
       {timer}
@@ -168,13 +173,19 @@ function GameHeader({ mobile, open, roundNumber, roundCount, totalScore, timer }
   if (mobile) {
     return (
       <header className="wf-dark flex shrink-0 items-center gap-[5px] bg-wf-ink px-2 py-1.5 text-white">
-        <Link
-          to="/home"
-          aria-label="BibleoGuessr, leave game and go home"
-          className="grid h-11 w-11 shrink-0 place-items-center"
-        >
-          <LogoMark size={28} />
-        </Link>
+        {/* Practice can be left at any time, so it gets a real Home button;
+            a scored game keeps only the wordmark. */}
+        {practice ? (
+          <HomeButton />
+        ) : (
+          <Link
+            to="/home"
+            aria-label="BibleoGuessr, leave game and go home"
+            className="grid h-11 w-11 shrink-0 place-items-center"
+          >
+            <LogoMark size={28} />
+          </Link>
+        )}
         {stats}
         <SoundToggle />
       </header>
@@ -192,6 +203,7 @@ function GameHeader({ mobile, open, roundNumber, roundCount, totalScore, timer }
           <LogoMark size={28} />
           <span className="text-[21px] font-extrabold">BibleoGuessr</span>
         </Link>
+        {practice && <HomeButton className="mr-3" />}
         {stats}
         <span className="ml-auto hidden items-center gap-2 text-[15px] text-wf-ondark lg:flex">
           {open ? <DragIcon /> : <InfoIcon />}
@@ -274,90 +286,6 @@ function VerseBanner({ text, mobile, compact }) {
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * Book closed, on every screen size: the book can be turned to look at, but
- * the page is chosen on a slider shaped like the page edges — far easier to
- * aim than a sliver of a 3D model — and opened with a button.
- */
-function ClosedPicker({ totalPages, activePage, onOpen }) {
-  const [page, setPage] = useState(() => (activePage > 1 ? activePage : Math.ceil(totalPages / 2)));
-  const [openRequest, setOpenRequest] = useState(null);
-  const percent = uFromPage(page, totalPages) * 100;
-  // Keep the page label on screen at the very ends of the slider.
-  const labelAt = Math.min(Math.max(percent, 13), 87);
-
-  function change(next) {
-    setPage(next);
-    play('edgeScrub');
-  }
-
-  return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2.5 md:max-w-[900px] md:flex-none md:gap-3">
-      <div className="min-h-[150px] w-full flex-1 md:h-[46vh] md:min-h-[320px] md:flex-none">
-        <ClosedBible3D
-          totalPages={totalPages}
-          onOpen={onOpen}
-          sliderPage={page}
-          openRequest={openRequest}
-        />
-      </div>
-
-      <div className="flex w-full shrink-0 flex-col gap-1.5">
-        <div className="relative h-[34px]">
-          <span
-            aria-hidden="true"
-            className="absolute bottom-0 -translate-x-1/2 whitespace-nowrap rounded bg-wf-ink px-3 pb-[3px] pt-1.5 text-base font-extrabold tabular-nums text-white"
-            style={{ left: `${labelAt}%` }}
-          >
-            Page {page.toLocaleString()}
-          </span>
-        </div>
-        <div className="relative box-border h-14 rounded-md bg-wf-navy px-2.5 py-1.5">
-          <div
-            aria-hidden="true"
-            className="h-full rounded-sm"
-            style={{
-              backgroundColor: '#efe6cf',
-              backgroundImage: 'repeating-linear-gradient(90deg, #d6c9a8 0 1px, transparent 1px 3px)',
-            }}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -bottom-1 -top-2 w-1 rounded-sm bg-wf-crimson"
-            style={{ left: `calc(10px + (100% - 20px) * ${percent / 100} - 2px)` }}
-          />
-          <input
-            type="range"
-            min={1}
-            max={totalPages}
-            step={1}
-            value={page}
-            onChange={(e) => change(Number(e.target.value))}
-            aria-label="Page to open"
-            aria-valuetext={`Page ${page.toLocaleString()}`}
-            className="peer absolute inset-0 m-0 h-full w-full cursor-pointer opacity-0"
-          />
-          <div className="pointer-events-none absolute inset-0 rounded-md peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-wf-cobalt" />
-        </div>
-        <p className="m-0 text-center text-sm text-wf-muted2">
-          Slide along the page edges, then open the Bible there.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setOpenRequest({ page })}
-        disabled={Boolean(openRequest)}
-        data-sound="none"
-        className="wf-btn-cobalt h-[54px] w-full shrink-0 text-lg"
-      >
-        <OpenBookIcon />
-        Open at page {page.toLocaleString()}
-      </button>
-    </div>
   );
 }
 

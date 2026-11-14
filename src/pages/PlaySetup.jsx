@@ -23,15 +23,17 @@ import {
  * into a state the server would reject.
  */
 const SETTINGS_KEY = 'bibleoguessr:lastSettings';
+/** Endless Practice remembers its own settings, apart from Singleplayer's. */
+const PRACTICE_SETTINGS_KEY = 'bibleoguessr:lastPracticeSettings';
 
-function loadRememberedSettings() {
+function loadRememberedSettings(key) {
   const fallback = {
     popularity: POPULARITY_DEFAULT,
     rounds: ROUND_COUNT_DEFAULT,
     timer: TIMER_DEFAULT,
   };
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     const validated = validateGameSettings(JSON.parse(raw));
     return validated.ok ? validated.value : fallback;
@@ -40,9 +42,9 @@ function loadRememberedSettings() {
   }
 }
 
-function rememberSettings(settings) {
+function rememberSettings(key, settings) {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(key, JSON.stringify(settings));
   } catch {
     // Storage being unavailable is not worth blocking a game over.
   }
@@ -57,10 +59,16 @@ function popularityDescription(value) {
   return 'Household verses almost every round.';
 }
 
-export default function PlaySetup() {
+/**
+ * Game setup, for Singleplayer and for Endless Practice. Practice is the same
+ * game with no round count and nothing recorded, so it shares this page minus
+ * the Rounds setting.
+ */
+export default function PlaySetup({ practice = false }) {
+  const settingsKey = practice ? PRACTICE_SETTINGS_KEY : SETTINGS_KEY;
   const navigate = useNavigate();
 
-  const remembered = useState(loadRememberedSettings)[0];
+  const remembered = useState(() => loadRememberedSettings(settingsKey))[0];
   const [popularity, setPopularity] = useState(remembered.popularity);
   const [rounds, setRounds] = useState(remembered.rounds);
   const [timer, setTimer] = useState(remembered.timer);
@@ -90,10 +98,14 @@ export default function PlaySetup() {
 
     setBusy(true);
     try {
-      rememberSettings(validated.value);
+      rememberSettings(settingsKey, validated.value);
       // The server draws the verses and keeps them; all we get back is a game
       // id and the text of round one.
-      const game = await startGame(validated.value);
+      const game = await startGame(
+        practice
+          ? { popularity: validated.value.popularity, timer: validated.value.timer, mode: 'practice' }
+          : validated.value
+      );
       navigate(`/game/${game.gameId}`, { state: { game } });
     } catch (err) {
       play('error');
@@ -104,8 +116,13 @@ export default function PlaySetup() {
 
   return (
     <PageShell width="max-w-[860px]">
-      <PageHeading crumbs={[{ label: 'Home', to: '/home' }, { label: 'Singleplayer' }]} title="Singleplayer">
-        Set the rules, then open the book.
+      <PageHeading
+        crumbs={[{ label: 'Home', to: '/home' }, { label: practice ? 'Endless Practice' : 'Singleplayer' }]}
+        title={practice ? 'Endless Practice' : 'Singleplayer'}
+      >
+        {practice
+          ? 'Round after round, for as long as you like. Nothing is counted or recorded.'
+          : 'Set the rules, then open the book.'}
       </PageHeading>
 
       <section aria-label="Game settings" className="wf-tray wf-dark">
@@ -158,7 +175,8 @@ export default function PlaySetup() {
           </p>
         </SettingRow>
 
-        {/* --- 2. Rounds ---------------------------------------------------- */}
+        {/* --- 2. Rounds (not in practice, which has none) ------------------- */}
+        {!practice && (
         <SettingRow number={2}>
           <span id="rounds-label" className="flex items-center gap-2.5 text-lg font-extrabold sm:text-xl">
             <MobileNumber n={2} />
@@ -205,10 +223,12 @@ export default function PlaySetup() {
           </div>
         </SettingRow>
 
-        {/* --- 3. Timer ----------------------------------------------------- */}
-        <SettingRow number={3}>
+        )}
+
+        {/* --- 3. Timer (2 in practice) -------------------------------------- */}
+        <SettingRow number={practice ? 2 : 3}>
           <label htmlFor="timer" className="flex items-center gap-2.5 text-lg font-extrabold sm:text-xl">
-            <MobileNumber n={3} />
+            <MobileNumber n={practice ? 2 : 3} />
             Round timer
           </label>
           {/* The border lives on the wrapper, so the arrow block can fill the inside
@@ -236,7 +256,9 @@ export default function PlaySetup() {
           </div>
           <p id="timer-help" className="m-0 text-sm leading-[1.45] text-wf-muted sm:text-[15px]">
             {timer === 0
-              ? `Untimed: take as long as you like on each round. All ${rounds} rounds still apply.`
+              ? practice
+                ? 'Untimed: take as long as you like on each round.'
+                : `Untimed: take as long as you like on each round. All ${rounds} rounds still apply.`
               : 'When the clock runs out the round submits automatically and scores zero.'}
           </p>
         </SettingRow>

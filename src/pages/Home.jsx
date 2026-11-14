@@ -1,16 +1,44 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import PageShell, { PageHeading } from '@/components/wf/PageShell';
+import ModeCard from '@/components/wf/ModeCard';
 import {
-  ArrowRight,
   NoteIcon,
   ModeBrowsing,
   ModeDuels,
   ModeMultiplayer,
+  ModePractice,
   ModeSingle,
 } from '@/components/wf/Icons';
 
-const COMING_SOON = [
+/**
+ * Every mode, in the order they always appear. Those with a `to` can be played:
+ * clicking one makes it the big cobalt card with the Play button; it does not
+ * navigate on its own. The rest are shown as coming soon.
+ */
+const MODES = [
+  {
+    id: 'singleplayer',
+    title: 'Singleplayer',
+    blurb: 'A verse, a Bible, and however long you dare take. Choose your rounds and play.',
+    Icon: ModeSingle,
+    to: '/play/setup',
+  },
+  {
+    id: 'practice',
+    title: 'Endless Practice',
+    blurb: 'Round after round, for as long as you like. Nothing counted, nothing recorded.',
+    Icon: ModePractice,
+    to: '/practice/setup',
+  },
+  {
+    id: 'browsing',
+    title: 'Browsing',
+    blurb: 'Wander the Bible freely, with no clock and nothing to score.',
+    Icon: ModeBrowsing,
+    to: '/browse',
+  },
   {
     id: 'duels',
     title: 'Duels',
@@ -23,16 +51,33 @@ const COMING_SOON = [
     blurb: 'A full lobby racing through the same set of verses.',
     Icon: ModeMultiplayer,
   },
-  {
-    id: 'browsing',
-    title: 'Browsing',
-    blurb: 'Wander the Bible freely, with no clock and nothing to score.',
-    Icon: ModeBrowsing,
-  },
 ];
+
+const SELECTED_KEY = 'bibleoguessr:homeMode';
+
+/** The mode last picked here, so coming back to Home keeps it highlighted. */
+function readSelected() {
+  try {
+    const saved = localStorage.getItem(SELECTED_KEY);
+    if (MODES.some((mode) => mode.id === saved && mode.to)) return saved;
+  } catch {
+    // Storage being unavailable just means starting on Singleplayer.
+  }
+  return 'singleplayer';
+}
 
 export default function Home() {
   const { displayName, isGuest, profile } = useAuth();
+  const [selected, setSelected] = useState(readSelected);
+
+  function select(id) {
+    setSelected(id);
+    try {
+      localStorage.setItem(SELECTED_KEY, id);
+    } catch {
+      // Not remembered; nothing else lost.
+    }
+  }
 
   return (
     <PageShell>
@@ -70,62 +115,48 @@ export default function Home() {
       </div>
 
       <section aria-label="Game modes" className="wf-tray wf-dark">
-        {/* The one mode that works: big, cobalt, and the obvious next step. */}
-        <div className="flex flex-col gap-3 overflow-hidden rounded bg-wf-cobalt p-[18px] pt-5 text-white sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-0 sm:p-0">
-          <div
-            aria-hidden="true"
-            className="hidden min-h-[150px] flex-[0_0_150px] place-items-center bg-wf-cobaltdeep sm:grid"
-          >
-            <ModeSingle />
-          </div>
-          <div className="flex items-center gap-3 sm:hidden">
-            <span aria-hidden="true" className="grid h-12 w-12 place-items-center rounded bg-wf-cobaltdeep">
-              <ModeSingle size={30} />
-            </span>
-            <h2 className="m-0 text-[30px] font-extrabold leading-none">Singleplayer</h2>
-          </div>
-          <div className="flex flex-col justify-center gap-2 sm:flex-[1_1_360px] sm:px-[30px] sm:py-[26px]">
-            <h2 className="m-0 hidden text-[40px] font-extrabold leading-none sm:block">Singleplayer</h2>
-            <p className="m-0 max-w-[520px] text-base leading-[1.45] text-wf-cobalttint sm:text-lg">
-              A verse, a Bible, and however long you dare take. Choose your rounds and play.
-            </p>
-          </div>
-          <div className="flex items-center sm:flex-[0_0_auto] sm:px-[30px] sm:py-[26px]">
-            <Link to="/play/setup" className="wf-btn-amber wf-btn-lg h-14 w-full sm:h-auto sm:w-auto">
-              Play <ArrowRight size={20} color="#23262b" />
-            </Link>
-          </div>
-        </div>
-
-        {COMING_SOON.map(({ id, title, blurb, Icon }) => (
-          <div
-            key={id}
-            aria-disabled="true"
-            title={`${title} is not available yet`}
-            className="flex select-none items-stretch overflow-hidden rounded bg-wf-mist text-wf-muted2"
-          >
-            <div aria-hidden="true" className="grid min-h-[72px] flex-[0_0_60px] place-items-center bg-wf-mist2 sm:min-h-[88px] sm:flex-[0_0_96px]">
-              <span className="sm:hidden">
-                <Icon size={30} />
-              </span>
-              <span className="hidden sm:block">
-                <Icon />
-              </span>
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-0.5 px-3.5 py-3 sm:px-6 sm:py-4">
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="text-[19px] font-extrabold sm:text-2xl">{title}</span>
-                <span className="text-[13px] font-bold text-wf-muted sm:hidden">Coming soon</span>
-              </span>
-              <span className="text-sm leading-snug sm:text-[15px]">{blurb}</span>
-            </div>
-            <div className="hidden items-center px-6 py-4 text-[15px] font-bold text-wf-muted sm:flex">
-              Coming soon
-            </div>
-          </div>
-        ))}
+        {MODES.map((mode) =>
+          !mode.to ? (
+            <ComingSoon key={mode.id} mode={mode} />
+          ) : (
+            <ModeCard
+              key={mode.id}
+              mode={mode}
+              selected={mode.id === selected}
+              onSelect={() => select(mode.id)}
+            />
+          )
+        )}
       </section>
     </PageShell>
+  );
+}
+
+function ComingSoon({ mode }) {
+  const { Icon } = mode;
+  return (
+    <div
+      aria-disabled="true"
+      title={`${mode.title} is not available yet`}
+      className="flex select-none items-stretch overflow-hidden rounded bg-wf-mist text-wf-muted2"
+    >
+      <div aria-hidden="true" className="grid min-h-[72px] flex-[0_0_60px] place-items-center bg-wf-mist2 sm:min-h-[88px] sm:flex-[0_0_96px]">
+        <span className="sm:hidden">
+          <Icon size={30} />
+        </span>
+        <span className="hidden sm:block">
+          <Icon />
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col justify-center gap-0.5 px-3.5 py-3 sm:px-6 sm:py-4">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="text-[19px] font-extrabold sm:text-2xl">{mode.title}</span>
+          <span className="text-[13px] font-bold text-wf-muted sm:hidden">Coming soon</span>
+        </span>
+        <span className="text-sm leading-snug sm:text-[15px]">{mode.blurb}</span>
+      </div>
+      <div className="hidden items-center px-6 py-4 text-[15px] font-bold text-wf-muted sm:flex">Coming soon</div>
+    </div>
   );
 }
 

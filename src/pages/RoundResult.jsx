@@ -7,6 +7,7 @@ import ScoreBar from '@/components/ScoreBar';
 import Celebration from '@/components/Celebration';
 import { useWfBody } from '@/components/wf/PageShell';
 import { ArrowRight } from '@/components/wf/Icons';
+import HomeButton from '@/components/wf/HomeButton';
 import { MAX_ROUND_SCORE } from '@shared/scoring';
 import { spreadStart } from '@/lib/pageCache';
 import { useIsMobile } from '@/lib/useMediaQuery';
@@ -179,6 +180,7 @@ function ResultCard({
   onInspect,
   onNext,
 }) {
+  const practice = lastResult.mode === 'practice';
   const guessDetail = guess
     ? timedOut
       ? `Page ${guess.page.toLocaleString()} — submitted when time ran out`
@@ -200,7 +202,7 @@ function ResultCard({
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1.5 px-2.5 pb-1.5 pt-1 text-white sm:px-[18px] sm:pb-3 sm:pt-4">
         <span className="text-[15px] font-bold text-wf-ondark2 sm:text-base">
-          Round {result.round + 1} of {lastResult.roundCount}
+          {practice ? `Round ${result.round + 1}` : `Round ${result.round + 1} of ${lastResult.roundCount}`}
         </span>
         <h1 className="m-0 font-normal tabular-nums">
           <b className="text-[42px] font-extrabold leading-none text-wf-amber sm:text-[54px]">
@@ -242,10 +244,14 @@ function ResultCard({
           <div className="flex flex-col items-end">
             <dt className="text-[13px] text-wf-muted sm:text-sm">Total so far</dt>
             <dd className="m-0 text-lg font-extrabold tabular-nums sm:text-[22px]">
-              {lastResult.totalScore.toLocaleString()}{' '}
-              <span className="text-[13px] font-semibold text-wf-muted sm:text-base">
-                / {lastResult.maxScore.toLocaleString()}
-              </span>
+              {lastResult.totalScore.toLocaleString()}
+              {/* Practice has no maximum: it never ends. */}
+              {!practice && (
+                <span className="text-[13px] font-semibold text-wf-muted sm:text-base">
+                  {' '}
+                  / {lastResult.maxScore.toLocaleString()}
+                </span>
+              )}
             </dd>
           </div>
         </dl>
@@ -259,6 +265,8 @@ function ResultCard({
       </div>
 
       <div className="flex flex-wrap gap-[5px] sm:gap-1.5">
+        {/* Practice can be left between rounds; a scored game cannot. */}
+        {practice && <HomeButton className="h-14 basis-full justify-center sm:h-auto sm:basis-auto sm:px-5" />}
         <button
           type="button"
           onClick={onInspect}
@@ -275,7 +283,7 @@ function ResultCard({
           className="wf-btn-amber h-14 flex-[1.2] text-lg sm:h-auto sm:flex-[2_1_280px] sm:text-[19px]"
           style={{ padding: '18px 20px 15px' }}
         >
-          {busy ? 'Loading…' : isLastRound ? 'See Final Results' : 'Next Round'}
+          {busy ? 'Loading…' : isLastRound && !practice ? 'See Final Results' : 'Next Round'}
           {!busy && <ArrowRight size={20} color="#23262b" />}
         </button>
       </div>

@@ -273,3 +273,34 @@ describe('evaluateGuess', () => {
     expect(result.answer.reference).toMatch(/^.+ \d+:\d+$/);
   });
 });
+
+/**
+ * Browsing mode's table of contents sends readers straight to each book. If it
+ * pointed at the wrong page the reader would land mid-way through the previous
+ * book, so every entry is checked against the page it names.
+ */
+describe('contents', () => {
+  const contents = JSON.parse(fs.readFileSync(path.join(PAGES_DIR, 'contents.json'), 'utf-8'));
+
+  it('lists every book, in order, once', () => {
+    expect(contents.map((entry) => entry.book)).toEqual(manifest.books);
+  });
+
+  it('starts Genesis on page 1 and climbs from there', () => {
+    expect(contents[0].page).toBe(1);
+    for (let i = 1; i < contents.length; i += 1) {
+      expect(contents[i].page).toBeGreaterThanOrEqual(contents[i - 1].page);
+    }
+    expect(contents.at(-1).page).toBeLessThanOrEqual(manifest.totalPages);
+  });
+
+  it("points each book at the page holding its first verse", () => {
+    contents.forEach((entry, bookIndex) => {
+      const page = getPage(entry.page);
+      const hasFirstVerse = page.refs.some(
+        ([book, chapter, verse]) => book === bookIndex && chapter === 1 && verse === 1
+      );
+      expect(hasFirstVerse, `${entry.book} on page ${entry.page}`).toBe(true);
+    });
+  });
+});

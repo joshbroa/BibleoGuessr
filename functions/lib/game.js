@@ -139,6 +139,24 @@ export function buildTargets(popularity, rounds) {
 }
 
 // ---------------------------------------------------------------------------
+// Endless Practice
+// ---------------------------------------------------------------------------
+
+/** Verses drawn at a time for an Endless Practice game. */
+export const PRACTICE_BATCH = 10;
+
+/**
+ * An Endless Practice game stores only the verses still to come, with the one
+ * being played first. After each guess: drop that verse, and when the queue is
+ * empty draw a fresh batch. Rounds already played are kept nowhere, so the game
+ * stays small and has no length limit.
+ */
+export function nextPracticeTargets(targets, popularity) {
+  const remaining = targets.slice(1);
+  return remaining.length ? remaining : buildTargets(popularity, PRACTICE_BATCH);
+}
+
+// ---------------------------------------------------------------------------
 // Guess evaluation
 // ---------------------------------------------------------------------------
 

@@ -18,16 +18,50 @@ let manifestPromise = null;
 /** Layout constants and book names, shared with the generator and the backend. */
 export function loadManifest() {
   if (!manifestPromise) {
-    manifestPromise = fetch(`${PAGES_BASE}/manifest.json`).then((response) => {
-      if (!response.ok) throw new Error(`Could not load the Bible manifest (${response.status})`);
-      return response.json();
-    });
+    manifestPromise = Promise.all([
+      fetch(`${PAGES_BASE}/manifest.json`).then((response) => {
+        if (!response.ok) throw new Error(`Could not load the Bible manifest (${response.status})`);
+        return response.json();
+      }),
+      loadScriptureFont(),
+    ]).then(([manifest]) => manifest);
     manifestPromise.catch(() => {
       // Let a failed load be retried rather than caching the rejection forever.
       manifestPromise = null;
     });
   }
   return manifestPromise;
+}
+
+/**
+ * Wait for the scripture font. A page painted before Tinos arrives would be
+ * set in a stand-in serif of different widths, and its words would overlap
+ * until the swap. A font that never loads must not block the game, so failure
+ * (or a browser without the Font Loading API) resolves anyway.
+ */
+function loadScriptureFont() {
+  if (typeof document === 'undefined' || !document.fonts?.load) return Promise.resolve();
+  return Promise.all([document.fonts.load('14px Tinos'), document.fonts.load('bold 14px Tinos')]).catch(() => {});
+}
+
+let contentsPromise = null;
+
+/**
+ * The table of contents: each book's name and the page its text starts on,
+ * written by the generator alongside the pages. Used by Browsing mode.
+ * @returns {Promise<{book: string, page: number}[]>}
+ */
+export function loadContents() {
+  if (!contentsPromise) {
+    contentsPromise = fetch(`${PAGES_BASE}/contents.json`).then((response) => {
+      if (!response.ok) throw new Error(`Could not load the contents (${response.status})`);
+      return response.json();
+    });
+    contentsPromise.catch(() => {
+      contentsPromise = null;
+    });
+  }
+  return contentsPromise;
 }
 
 /**
